@@ -2,6 +2,21 @@
 
 A personal study on operating systems, with help from the OSDev Wiki. A long-term weekend side project.
 
+### Quick start
+
+Make sure to have [QEMU][qemu] and [GNU `make`][make] installed.
+
+```bash
+# Fetch Limine dependency
+git submodule init
+git submodule update
+
+# Build and run either iso or hdd
+cd src/
+./build_iso.sh && ./run_iso.sh
+./build_hdd.sh && ./run_hdd.sh
+```
+
 ### Learning goals
 
 I.e., interest points.
@@ -25,3 +40,5 @@ I.e., interest points.
 - [Latency Aware Operating System][laos-2]
 
 [laos-2]: https://www4.cs.fau.de/Research/LAOS/
+[qemu]: https://wiki.archlinux.org/title/QEMU
+[make]: https://www.gnu.org/software/make/

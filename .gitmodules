@@ -2,3 +2,4 @@
 	path = src/limine
 	url = https://github.com/limine-bootloader/limine.git
 	branch = v4.x-branch-binary
+        shallow = true

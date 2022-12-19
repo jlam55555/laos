@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# Download the latest Limine binary release.
-git clone https://github.com/limine-bootloader/limine.git --branch=v4.x-branch-binary --depth=1
+# Build kernel.
+make
 
 # Build limine-deploy.
 make -C limine
