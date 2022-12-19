@@ -11,6 +11,7 @@ I.e., interest points.
 - Scheduling on a multiprocessor system, especially focusing on latencies and power requirements on a RTS-like system
 - Operating characteristics of popular ARM processors (e.g., ARM Cortex R52); tracing and observing real latencies at high precision. (However, an initial port to x86-64 may be simpler)
 - Interrupt handling and latencies
+- Integrating Rust as a systems language
 
 ### Non-goals
 
