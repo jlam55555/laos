@@ -12,10 +12,11 @@ git submodule init
 git submodule update
 
 # Build and run either iso or hdd
-cd src/
-./build_iso.sh && ./run_iso.sh
-./build_hdd.sh && ./run_hdd.sh
+make run_iso
+make run_hdd
 ```
+
+See the [Makefile](./Makefile) for more possible build targets.
 
 ### Learning goals
 

@@ -1,2 +1,5 @@
+# Build outputs
+out/
+
 # Emacs tempfiles
 *~
