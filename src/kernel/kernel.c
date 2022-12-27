@@ -9,6 +9,9 @@
 static volatile struct limine_terminal_request terminal_request = {
     .id = LIMINE_TERMINAL_REQUEST, .revision = 0};
 
+static volatile void *volatile limine_requests[]
+    __attribute__((section(".limine_reqs"))) = {&terminal_request, NULL};
+
 static void done(void) {
   for (;;) {
     __asm__("hlt");
