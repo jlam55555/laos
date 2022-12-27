@@ -30,13 +30,13 @@ $(eval $(call DEFAULT_VAR,CC,cc))
 $(eval $(call DEFAULT_VAR,LD,ld))
 
 # User controllable CFLAGS.
-CFLAGS ?= -g -O2 -pipe -Wall -Wextra
+CFLAGS ?= -O2 -pipe -Wall -Wextra
 
 # User controllable preprocessor flags. We set none by default.
 CPPFLAGS ?=
 
 # User controllable nasm flags.
-NASMFLAGS ?= -F dwarf -g
+NASMFLAGS ?= -F dwarf
 
 # User controllable linker flags. We set none by default.
 LDFLAGS ?=
@@ -93,6 +93,14 @@ all: $(KERNEL_OUT_DIR)/$(KERNEL)
 # Link rules for the final kernel executable.
 $(KERNEL_OUT_DIR)/$(KERNEL): $(OBJ) $(KERNEL_OUT_DIR)
 	$(LD) $(OBJ) $(LDFLAGS) -o $@
+
+# Alias for building the kernel.
+kernel: $(KERNEL_OUT_DIR)/$(KERNEL)
+
+# Adding debug flags to the kernel.
+kernel_debug: CFLAGS += -DDEBUG -g -save-temps
+kernel_debug: NASMFLAGS += -DDEBUG -g
+kernel_debug: kernel
 
 # Include header dependencies.
 -include $(HEADER_DEPS)
