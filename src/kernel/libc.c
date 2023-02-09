@@ -199,7 +199,9 @@ static inline void _buf_writer(char c, char *buf, size_t i, size_t buf_sz) {
   buf[i] = c;
 }
 
-static inline void _term_writer(char c, char *, size_t, size_t) {
+static inline void _term_writer(char c, __attribute__((unused)) char *_buf,
+                                __attribute__((unused)) size_t _i,
+                                __attribute__((unused)) size_t _buf_sz) {
   terminal_request.response->write(terminal, &c, 1);
 }
 

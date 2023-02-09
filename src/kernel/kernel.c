@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "bios_reqs.h"
+#include "gdt.h"
 #include "libc.h"
 
 // The Limine requests can be placed anywhere, but it is important that
@@ -23,7 +24,7 @@ static void done(void) {
   }
 }
 
-static void run_printf_tests(void) {
+__attribute__((unused)) static void run_printf_tests(void) {
   // Run some printf tests.
   char buf[256];
   for (int i = 0; i < 256; ++i) {
@@ -77,6 +78,45 @@ static void run_printf_tests(void) {
   printf("got len=%d\n", len);
 }
 
+static void print_gdtr_info(void) {
+  struct gdtr_desc gdtr;
+  struct segment_desc *seg_desc;
+  int num_entries;
+  size_t base, limit;
+
+  read_gdt(&gdtr);
+  printf("gdtr {\n\t.sz=0x%hx\n\t.off=0x%lx\n}\n", gdtr.sz, gdtr.off);
+
+  // Read segment descriptors.
+  num_entries = ((size_t)gdtr.sz + 1) >> 3;
+  seg_desc = (struct segment_desc *)gdtr.off;
+  for (; num_entries--; ++seg_desc) {
+    // Compute limit. Multiply by page granularity if specified.
+    limit = (size_t)seg_desc->limit_2 << 16 | seg_desc->limit_1;
+    if (seg_desc->flags_g) {
+      limit = ((limit + 1) << 12) - 1;
+    }
+    // Compute base.
+    base = (size_t)seg_desc->base_3 << 24 | (size_t)seg_desc->base_2 << 16 |
+           seg_desc->base_1;
+    printf("segment {\n"
+           "\t.limit=0x%lx\n"
+           "\t.base=0x%lx\n"
+           "\t.read_write=%d\n"
+           "\t.accessed=%d\n"
+           "\t.direction_conforming=%d\n"
+           "\t.executable=%d\n"
+           "\t.is_system=%d\n"
+           "\t.cpu_privilege=%d\n"
+           "\t.is_long_mode_code=%d\n"
+           "\t.is_32bit_protected_mode=%d\n"
+           "}\n",
+           limit, base, seg_desc->access_rw, seg_desc->access_a,
+           seg_desc->access_dc, seg_desc->access_e, seg_desc->access_s,
+           seg_desc->access_dpl, seg_desc->flags_l, seg_desc->flags_db);
+  }
+}
+
 // The following will be our kernel's entry point.
 void _start(void) {
   if (terminal_request.response == NULL ||
@@ -87,7 +127,8 @@ void _start(void) {
 
   // Do some basic printf tests.
   // TODO: turn these into unit tests.
-  run_printf_tests();
+  /* run_printf_tests(); */
+  print_gdtr_info();
 
   // We're done, just hang...
   done();
