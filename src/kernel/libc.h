@@ -2,6 +2,9 @@
 #define LIBC_H
 
 #include <stdarg.h>
+#include <stddef.h>
+
+typedef enum bool { false, true } bool;
 
 size_t strlen(char *);
 

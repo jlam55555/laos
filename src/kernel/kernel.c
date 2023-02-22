@@ -3,8 +3,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "arch/x86_64/registers.h"
 #include "bios_reqs.h"
 #include "gdt.h"
+#include "idt.h"
 #include "libc.h"
 
 // The Limine requests can be placed anywhere, but it is important that
@@ -18,9 +20,14 @@ struct limine_terminal *terminal = NULL;
 static volatile void *volatile limine_requests[]
     __attribute__((section(".limine_reqs"))) = {&terminal_request, NULL};
 
+static volatile int i = 0;
 static void done(void) {
   for (;;) {
     __asm__("hlt");
+    if (i) {
+      printf("Got keyboard interrupt!\n");
+      i = 0;
+    }
   }
 }
 
@@ -88,7 +95,7 @@ static void print_gdtr_info(void) {
   printf("gdtr {\n\t.sz=0x%hx\n\t.off=0x%lx\n}\n", gdtr.sz, gdtr.off);
 
   // Read segment descriptors.
-  num_entries = ((size_t)gdtr.sz + 1) >> 3;
+  num_entries = ((size_t)gdtr.sz + 1) / sizeof(*seg_desc);
   seg_desc = (struct segment_desc *)gdtr.off;
   for (; num_entries--; ++seg_desc) {
     // Compute limit. Multiply by page granularity if specified.
@@ -117,6 +124,117 @@ static void print_gdtr_info(void) {
   }
 }
 
+static void create_interrupt_gate(struct gate_desc *gate_desc, void *isr) {
+  // Select 64-bit code segment of the GDT. See
+  // https://github.com/limine-bootloader/limine/blob/trunk/PROTOCOL.md#x86_64.
+  gate_desc->segment_selector = (struct segment_selector){
+      .rpl = 0,
+      .ti = 0,
+      .index = 5,
+  };
+
+  // Don't use IST.
+  gate_desc->ist = 0;
+
+  // ISR.
+  gate_desc->gate_type = 0xe;
+
+  // Run in ring 0.
+  gate_desc->dpl = 0;
+
+  // Present bit.
+  gate_desc->p = 1;
+
+  // Set offsets slices.
+  gate_desc->off_1 = (size_t)isr;
+  gate_desc->off_2 = ((size_t)isr >> 16) & 0xffff;
+  gate_desc->off_3 = (size_t)isr >> 32;
+}
+
+// See https://wiki.osdev.org/Interrupt_Service_Routines
+struct interrupt_frame {
+  size_t ip;
+  size_t cs;
+  size_t flags;
+  size_t sp;
+  size_t ss;
+};
+
+static inline void outb(uint8_t value, uint16_t port) {
+  __asm__("outb %[value], %[port]" : : [value] "a"(value), [port] "Nd"(port));
+}
+
+static inline uint8_t inb(uint16_t port) {
+  uint8_t rv;
+  __asm__ volatile("inb %1, %0" : "=a"(rv) : "d"(port));
+  return rv;
+}
+
+// See https://wiki.osdev.org/8259_PIC
+#define PIC1 0x20 /* IO base address for master PIC */
+#define PIC2 0xA0 /* IO base address for slave PIC */
+#define PIC1_COMMAND PIC1
+#define PIC1_DATA (PIC1 + 1)
+#define PIC2_COMMAND PIC2
+#define PIC2_DATA (PIC2 + 1)
+#define PIC_EOI 0x20 /* End-of-interrupt command code */
+void PIC_sendEOI(unsigned char irq) {
+  if (irq >= 8)
+    outb(PIC_EOI, PIC2_COMMAND);
+
+  outb(PIC_EOI, PIC1_COMMAND);
+}
+
+__attribute__((interrupt)) void
+timer_irq(__attribute__((unused)) struct interrupt_frame *frame) {
+  // Nothing to do for now.
+  PIC_sendEOI(0);
+}
+
+__attribute__((interrupt)) void
+kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
+  // Read scancode. (This is necessary or else the IRQ won't fire
+  // again. Not sure exactly why -- may be related to:
+  // https://forum.osdev.org/viewtopic.php?f=1&t=23255)
+  inb(0x60);
+  ++i;
+
+  PIC_sendEOI(0);
+}
+
+static struct gate_desc gates[64] = {};
+static struct idtr_desc idtr = {
+    .off = (uint64_t)&gates,
+    .sz = sizeof(gates) - 1,
+};
+
+static void print_idtr_info(void) {
+  struct idtr_desc idtr;
+  struct gate_desc *gate_desc;
+  int num_entries;
+  size_t off;
+
+  read_idt(&idtr);
+  printf("idtr {\n\t.sz=0x%hx\n\t.off=0x%lx\n}\n", idtr.sz, idtr.off);
+
+  // Read segment descriptors.
+  num_entries = ((size_t)idtr.sz + 1) / sizeof(*gate_desc);
+  gate_desc = (struct gate_desc *)idtr.off;
+  for (; num_entries--; ++gate_desc) {
+    off = (size_t)gate_desc->off_3 << 32 | (size_t)gate_desc->off_2 << 16 |
+          gate_desc->off_1;
+    printf("gate {\n"
+           "\t.off=0x%lx\n"
+           "\t.ist=0x%lx\n"
+           "\t.gate_type=0x%x\n"
+           "\t.dpl=0x%x\n"
+           "\t.p=0x%x\n"
+           "}\n",
+           off, gate_desc->ist, gate_desc->gate_type, gate_desc->dpl,
+           gate_desc->p);
+  }
+}
+
 // The following will be our kernel's entry point.
 void _start(void) {
   if (terminal_request.response == NULL ||
@@ -125,10 +243,29 @@ void _start(void) {
   }
   terminal = terminal_request.response->terminals[0];
 
-  // Do some basic printf tests.
-  // TODO: turn these into unit tests.
   /* run_printf_tests(); */
-  print_gdtr_info();
+  /* print_gdtr_info(); */
+
+  create_interrupt_gate(&gates[32], timer_irq);
+  create_interrupt_gate(&gates[33], kb_irq);
+  /* print_idtr_info(); */
+
+  // https://forum.osdev.org/viewtopic.php?p=316295#p316295
+  outb(0x11, 0x20);
+  outb(0x11, 0xA0);
+  outb(0x20, 0x21);
+  outb(40, 0xA1);
+  outb(0x04, 0x21);
+  outb(0x02, 0xA1);
+  outb(0x01, 0x21);
+  outb(0x01, 0xA1);
+  outb(0xF8, 0x21);
+  outb(0xEF, 0xA1);
+
+  load_idtr(&idtr);
+
+  /* __asm__ volatile("int $33"); */
+  __asm__ volatile("sti");
 
   // We're done, just hang...
   done();
