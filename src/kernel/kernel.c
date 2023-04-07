@@ -8,6 +8,7 @@
 #include "gdt.h"
 #include "idt.h"
 #include "libc.h"
+#include "terminal.h"
 
 // The Limine requests can be placed anywhere, but it is important that
 // the compiler does not optimise them away, so, usually, they should
@@ -85,7 +86,7 @@ __attribute__((unused)) static void run_printf_tests(void) {
   printf("got len=%d\n", len);
 }
 
-static void print_gdtr_info(void) {
+__attribute__((unused)) static void print_gdtr_info(void) {
   struct gdtr_desc gdtr;
   struct segment_desc *seg_desc;
   int num_entries;
@@ -208,7 +209,7 @@ static struct idtr_desc idtr = {
     .sz = sizeof(gates) - 1,
 };
 
-static void print_idtr_info(void) {
+__attribute__((unused)) static void print_idtr_info(void) {
   struct idtr_desc idtr;
   struct gate_desc *gate_desc;
   int num_entries;
