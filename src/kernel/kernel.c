@@ -13,13 +13,15 @@
 // The Limine requests can be placed anywhere, but it is important that
 // the compiler does not optimise them away, so, usually, they should
 // be made volatile or equivalent.
-volatile struct limine_terminal_request terminal_request = {
-    .id = LIMINE_TERMINAL_REQUEST, .revision = 0};
+/* volatile struct limine_terminal_request terminal_request = { */
+/*     .id = LIMINE_TERMINAL_REQUEST, .revision = 0}; */
 
 struct limine_terminal *terminal = NULL;
 
-static volatile void *volatile limine_requests[]
-    __attribute__((section(".limine_reqs"))) = {&terminal_request, NULL};
+// This might not do anything right now with .limine_reqs not
+// linked in.
+/* static volatile void *volatile limine_requests[] */
+/*     __attribute__((section(".limine_reqs"))) = {&terminal_request, NULL}; */
 
 static volatile int i = 0;
 static void done(void) {
@@ -236,17 +238,7 @@ __attribute__((unused)) static void print_idtr_info(void) {
   }
 }
 
-// The following will be our kernel's entry point.
-void _start(void) {
-  if (terminal_request.response == NULL ||
-      terminal_request.response->terminal_count < 1) {
-    done();
-  }
-  terminal = terminal_request.response->terminals[0];
-
-  /* run_printf_tests(); */
-  /* print_gdtr_info(); */
-
+__attribute__((unused)) static void create_keyboard_interrupt() {
   create_interrupt_gate(&gates[32], timer_irq);
   create_interrupt_gate(&gates[33], kb_irq);
   /* print_idtr_info(); */
@@ -267,6 +259,83 @@ void _start(void) {
 
   /* __asm__ volatile("int $33"); */
   __asm__ volatile("sti");
+}
+
+// note this example will always write to the top
+// line of the screen
+void write_string(int colour, const char *string) {
+  volatile char *video = (volatile char *)0xB8000;
+  while (*string != 0) {
+    *video++ = *string++;
+    *video++ = colour;
+  }
+}
+
+// The following will be our kernel's entry point.
+void _start(void) {
+  /* if (terminal_request.response == NULL || */
+  /*     terminal_request.response->terminal_count < 1) { */
+  /*   done(); */
+  /* } */
+  /* terminal = terminal_request.response->terminals[0]; */
+
+  /* run_printf_tests(); */
+  /* print_gdtr_info(); */
+  /* create_keyboard_interrupt(); */
+
+  /* printf("Hello, world\n"); */
+
+  // For testing: from osdev
+  term_set_color(0x1f);
+  char buf[80 * 200 + 1];
+  for (int i = 0; i < 80 * 200; ++i) {
+    char c = (i / 80) % 10 + '0';
+    /* term_write(&c, 1); */
+    buf[i] = c;
+  }
+  buf[80 * 200] = 0;
+  term_writez(&buf);
+  /* video[0] = 'a'; */
+  /* video[1] = 0x1f; */
+  /* video[2] = 'd'; */
+  /* video[3] = 0x1f; */
+  /* video[4] = 'b'; */
+  /* video[5] = 0x1f; */
+  /* video[6] = 'c'; */
+  /* video[7] = 0x1f; */
+
+  /* char a, b; */
+  /* printf("1 -- %x %x\n", video[4], video[5]); */
+  /* printf("2 -- %x %x\n", a, b); */
+
+  /* video[4] = 0x1f; */
+  /* video[5] = 'b'; */
+  /* a = 0x1f; */
+  /* b = 'b'; */
+  /* printf("3 -- %x %x\n", video[4], video[5]); */
+  /* printf("4 -- %x %x\n", a, b); */
+
+  /* for (int i = 0; i < 25 * 80 - 1; ++i) { */
+  /*   video[2 * i] = 'a' + (i % 26); */
+  /*   video[2 * i + 1] = 0x02; */
+  /* } */
+
+  /* printf("hello world 2"); */
+
+  /* write_string(0x1f, "Hello, world"); */
+
+  /* volatile uint16_t a = detect_bios_area_hardware(); */
+  /* switch (get_bios_area_video_type()) { */
+  /* case VIDEO_TYPE_COLOUR: */
+  /*   printf("Color\n"); */
+  /*   break; */
+  /* case VIDEO_TYPE_MONOCHROME: */
+  /*   printf("Mono\n"); */
+  /*   break; */
+  /* case VIDEO_TYPE_NONE: */
+  /*   printf("None\n"); */
+  /*   break; */
+  /* } */
 
   // We're done, just hang...
   done();

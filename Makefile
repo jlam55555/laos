@@ -96,6 +96,7 @@ $(KERNEL_OUT_DIR)/$(KERNEL): $(OBJ) $(KERNEL_OUT_DIR)
 
 # Alias for building the kernel.
 kernel: $(KERNEL_OUT_DIR)/$(KERNEL)
+	@ # Prevent the default cc rule from being run.
 
 # Adding debug flags to the kernel.
 kernel_debug: CFLAGS += -DDEBUG -g -save-temps
@@ -105,19 +106,19 @@ kernel_debug: kernel
 # Include header dependencies.
 -include $(HEADER_DEPS)
 
-$(KERNEL_OUT_DIR):
-	mkdir -p $(KERNEL_OUT_DIR)
-
 # Compilation rules for *.c files.
-$(KERNEL_OUT_DIR)/%.o: $(KERNEL_SRC_DIR)/%.c $(KERNEL_OUT_DIR)
+$(KERNEL_OUT_DIR)/%.o: $(KERNEL_SRC_DIR)/%.c
+	mkdir -p $(shell dirname "$@")
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 # Compilation rules for *.S files.
-$(KERNEL_OUT_DIR)/%.o: $(KERNEL_OUT_DIR) $(KERNEL_SRC_DIR)/%.S
+$(KERNEL_OUT_DIR)/%.o: $(KERNEL_SRC_DIR)/%.S
+	mkdir -p $(shell dirname "$@")
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 # Compilation rules for *.asm (nasm) files.
-$(KERNEL_OUT_DIR)/%.o: $(KERNEL_OUT_DIR) $(KERNEL_SRC_DIR)/%.asm
+$(KERNEL_OUT_DIR)/%.o: $(KERNEL_SRC_DIR)/%.asm
+	mkdir -p $(shell dirname "$@")
 	nasm $(NASMFLAGS) $< -o $@
 
 .PHONY: limine

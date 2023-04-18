@@ -23,6 +23,7 @@ SECTIONS
     . = 0xffffffff80000000;
  
     .text : {
+        *(.realmode) /* Let's see if this works. */
         *(.text .text.*)
     } :text
  

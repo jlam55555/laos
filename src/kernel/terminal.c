@@ -16,7 +16,7 @@ static struct term_spec _term_spec = {
 };
 
 // Scrollback buffer.
-static char term_buf[TERM_SCROLLBACK][2 * TERM_COLS] = {};
+static char _term_buf[TERM_SCROLLBACK][2 * TERM_COLS] = {};
 
 static struct term_cursor _term_cursor = {
     .row = 0,
@@ -41,7 +41,8 @@ const struct term_spec *term_get_spec() { return &_term_spec; }
 static void _term_refresh(void) {
   for (int i = 0; i < TERM_ROWS; ++i) {
     for (int j = 0; j < 2 * TERM_COLS; ++j) {
-      _term_video[i * 2 * TERM_COLS + j] = term_buf[_term_cursor.row + i][j];
+      _term_video[i * 2 * TERM_COLS + j] =
+          _term_buf[_term_cursor.win_top + i][j];
     }
   }
 }
@@ -52,8 +53,8 @@ static void _term_putchar(char c, bool refresh) {
   //    and other special characters.
 
   // Update the scrollback buffer.
-  term_buf[_term_cursor.row][2 * _term_cursor.col] = c;
-  term_buf[_term_cursor.row][2 * _term_cursor.col + 1] = c;
+  _term_buf[_term_cursor.row][2 * _term_cursor.col] = c;
+  _term_buf[_term_cursor.row][2 * _term_cursor.col + 1] = _term_cursor.color;
 
   _term_advance(false);
   if (refresh) {
@@ -104,9 +105,28 @@ void term_scroll_abs(int win_top) {
     return;
   }
 
-  // TODO(jlam55555): Implement this.
-  //     We need to be careful about where to place the cursor
-  //     if we advance the scrollback buffer.
+  // If we scroll past the scrollback buffer, then
+  // copy lines backwards, clear new lines.
+  if (win_top > TERM_SCROLLBACK - TERM_ROWS) {
+    int new_line_count = win_top - (TERM_SCROLLBACK - TERM_ROWS);
+    win_top -= new_line_count;
+
+    // Copy rows.
+    for (int i = 0; i < TERM_SCROLLBACK; ++i) {
+      int zero = i + new_line_count >= TERM_SCROLLBACK;
+      for (int j = 0; j < TERM_COLS; ++j) {
+        _term_buf[i][2 * j] = zero ? ' ' : _term_buf[i + new_line_count][2 * j];
+        _term_buf[i][2 * j + 1] =
+            zero ? 0x0 : _term_buf[i + new_line_count][2 * j + 1];
+      }
+    }
+
+    // Move cursor backwards.
+    _term_cursor.row -= new_line_count;
+  }
+
+  // Move window top.
+  _term_cursor.win_top = win_top;
 
   _term_refresh();
 }
