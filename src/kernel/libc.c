@@ -1,7 +1,7 @@
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 
-#include "bios_reqs.h"
 #include "libc.h"
 
 size_t strlen(char *s) {
