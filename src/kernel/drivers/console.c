@@ -30,8 +30,9 @@ static struct console _console = {
 };
 
 void _init_driver(struct console_driver *driver) {
-  driver->console = _console;
-  driver->console.cursor = _default_console_cursor;
+  driver->dev = &_console;
+  driver->dev->driver = driver;
+  driver->dev->cursor = _default_console_cursor;
 }
 
 /**

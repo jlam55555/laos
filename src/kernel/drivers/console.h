@@ -52,17 +52,19 @@ struct console_cursor {
  * and the scrollback buffer (which should have size
  * 2*rows*cols).
  */
+struct console_driver;
 struct console {
   struct console_spec spec;
   struct console_cursor cursor;
   char *buf;
+  struct console_driver *driver;
 };
 
 /**
  * Console driver.
  */
 struct console_driver {
-  struct console console;
+  struct console *dev;
   void (*init_driver)(struct console_driver *);
   void (*handle_scroll)(struct console *, int);
   void (*handle_write)(struct console *, const char *, size_t);

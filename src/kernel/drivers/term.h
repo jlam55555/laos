@@ -36,22 +36,25 @@ void term_ringbuf_init(struct term_ringbuf *);
 size_t term_ringbuf_write(struct term_ringbuf *, char *, size_t);
 size_t term_ringbuf_read(struct term_ringbuf *, char *, size_t);
 
-struct term_driver {
+struct term_driver;
+struct term {
   // Echoing is on/off.
   bool echo;
 
-  // Master to slave.
+  // Master-to-slave and slave-to-master queues.
   struct term_ringbuf mts_buf;
-
-  // Slave to master.
   struct term_ringbuf stm_buf;
 
-  // Operations.
+  struct term_driver *driver;
+};
+
+struct term_driver {
+  struct term *dev;
   void (*driver_init)(struct term_driver *);
-  void (*handle_master_write)(struct term_driver *, char *, size_t);
-  int (*handle_master_read)(struct term_driver *, char *, size_t);
-  void (*handle_slave_write)(struct term_driver *, char *, size_t);
-  int (*handle_slave_read)(struct term_driver *, char *, size_t);
+  void (*handle_master_write)(struct term *, char *, size_t);
+  int (*handle_master_read)(struct term *, char *, size_t);
+  void (*handle_slave_write)(struct term *, char *, size_t);
+  int (*handle_slave_read)(struct term *, char *, size_t);
 };
 
 // TODO: make it into a factory function that

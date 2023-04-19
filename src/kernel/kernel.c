@@ -10,6 +10,7 @@
 #include "libc.h"
 /* #include "terminal.h" */
 #include "drivers/console.h"
+#include "drivers/term.h"
 
 // The Limine requests can be placed anywhere, but it is important that
 // the compiler does not optimise them away, so, usually, they should
@@ -297,6 +298,8 @@ void _start(void) {
   /* buf[80 * 200] = 0; */
   /* term_writez(&buf); */
 
+#if 1
+
   char buf[80 * 10];
   for (int i = 0; i < 80 * 10; ++i) {
     char c = (i / 80) % 10 + '0';
@@ -304,9 +307,15 @@ void _start(void) {
   }
 
   struct console_driver *console_driver = get_default_console_driver();
-  struct console *console = &console_driver->console;
+  struct console *console = console_driver->dev;
   console->cursor.color = 0x1f;
   console_driver->handle_write(console, buf, sizeof(buf));
+
+  struct term_driver *term_driver = get_default_term_driver();
+  term_driver->handle_master_write(term_driver->dev, "master", 6);
+  term_driver->handle_slave_write(term_driver->dev, "slave", 5);
+
+#endif
 
   /* video[0] = 'a'; */
   /* video[1] = 0x1f; */
