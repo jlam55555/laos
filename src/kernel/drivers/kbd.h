@@ -7,9 +7,9 @@
 #define KBD_H
 
 struct kbd_driver {
-  void (*handle_kbd_irq)(char);
+  void (*kbd_irq)(char);
 };
 
-extern struct kbd_driver default_kbd_driver;
+struct kbd_driver *get_default_kbd_driver(void);
 
 #endif // KBD_H

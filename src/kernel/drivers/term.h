@@ -51,10 +51,10 @@ struct term {
 struct term_driver {
   struct term *dev;
   void (*driver_init)(struct term_driver *);
-  void (*handle_master_write)(struct term *, char *, size_t);
-  int (*handle_master_read)(struct term *, char *, size_t);
-  void (*handle_slave_write)(struct term *, char *, size_t);
-  int (*handle_slave_read)(struct term *, char *, size_t);
+  void (*master_write)(struct term *, char *, size_t);
+  int (*master_read)(struct term *, char *, size_t);
+  void (*slave_write)(struct term *, char *, size_t);
+  int (*slave_read)(struct term *, char *, size_t);
 };
 
 // TODO: make it into a factory function that

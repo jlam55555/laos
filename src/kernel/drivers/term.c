@@ -21,26 +21,26 @@ size_t term_ringbuf_read(struct term_ringbuf *rb, char *buf, size_t sz) {
   return i;
 }
 
-static void _handle_master_write(struct term *term, char *buf, size_t sz) {
+static void _master_write(struct term *term, char *buf, size_t sz) {
   if (term->echo) {
-    term->driver->handle_slave_write(term, buf, sz);
+    term->driver->slave_write(term, buf, sz);
   }
 
   term_ringbuf_write(&term->mts_buf, buf, sz);
 }
-static int _handle_master_read(__attribute__((unused)) struct term *term,
-                               __attribute__((unused)) char *buf,
-                               __attribute__((unused)) size_t sz) {
-  /* Noop; default_handle_slave_write() will call the console driver */
+static int _master_read(__attribute__((unused)) struct term *term,
+                        __attribute__((unused)) char *buf,
+                        __attribute__((unused)) size_t sz) {
+  /* Noop; _slave_write() will call the console driver */
   return 0;
 }
-static void _handle_slave_write(__attribute__((unused)) struct term *term,
-                                char *buf, size_t sz) {
+static void _slave_write(__attribute__((unused)) struct term *term, char *buf,
+                         size_t sz) {
   /* Forwards the request to the console driver. */
   struct console_driver *console_driver = get_default_console_driver();
-  console_driver->handle_write(console_driver->dev, buf, sz);
+  console_driver->write(console_driver->dev, buf, sz);
 }
-static int _handle_slave_read(struct term *term, char *buf, size_t sz) {
+static int _slave_read(struct term *term, char *buf, size_t sz) {
   return term_ringbuf_read(&term->mts_buf, buf, sz);
 }
 static struct term _term_device = {
@@ -54,10 +54,10 @@ static void _driver_init(struct term_driver *driver) {
 }
 static struct term_driver default_term_driver = {
     .driver_init = _driver_init,
-    .handle_master_write = _handle_master_write,
-    .handle_master_read = _handle_master_read,
-    .handle_slave_write = _handle_slave_write,
-    .handle_slave_read = _handle_slave_read,
+    .master_write = _master_write,
+    .master_read = _master_read,
+    .slave_write = _slave_write,
+    .slave_read = _slave_read,
 };
 
 struct term_driver *get_default_term_driver(void) {

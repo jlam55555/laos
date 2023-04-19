@@ -66,8 +66,8 @@ struct console {
 struct console_driver {
   struct console *dev;
   void (*init_driver)(struct console_driver *);
-  void (*handle_scroll)(struct console *, int);
-  void (*handle_write)(struct console *, const char *, size_t);
+  void (*scroll)(struct console *, int);
+  void (*write)(struct console *, const char *, size_t);
 };
 
 struct console_driver *get_default_console_driver(void);

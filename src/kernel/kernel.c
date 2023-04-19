@@ -309,11 +309,11 @@ void _start(void) {
   struct console_driver *console_driver = get_default_console_driver();
   struct console *console = console_driver->dev;
   console->cursor.color = 0x1f;
-  console_driver->handle_write(console, buf, sizeof(buf));
+  console_driver->write(console, buf, sizeof(buf));
 
   struct term_driver *term_driver = get_default_term_driver();
-  term_driver->handle_master_write(term_driver->dev, "master", 6);
-  term_driver->handle_slave_write(term_driver->dev, "slave", 5);
+  term_driver->master_write(term_driver->dev, "master", 6);
+  term_driver->slave_write(term_driver->dev, "slave", 5);
 
 #endif
 

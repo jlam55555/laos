@@ -143,8 +143,8 @@ static void _console_advance(struct console *console, bool refresh) {
 
 static struct console_driver _console_driver = {
     .init_driver = _init_driver,
-    .handle_scroll = _console_scroll,
-    .handle_write = _console_write,
+    .scroll = _console_scroll,
+    .write = _console_write,
 };
 
 struct console_driver *get_default_console_driver(void) {
