@@ -4,11 +4,12 @@
 #include <stdint.h>
 
 #include "arch/x86_64/registers.h"
-#include "bios_reqs.h"
+/* #include "bios_reqs.h" */
 #include "gdt.h"
 #include "idt.h"
 #include "libc.h"
-#include "terminal.h"
+/* #include "terminal.h" */
+#include "drivers/console.h"
 
 // The Limine requests can be placed anywhere, but it is important that
 // the compiler does not optimise them away, so, usually, they should
@@ -16,7 +17,7 @@
 /* volatile struct limine_terminal_request terminal_request = { */
 /*     .id = LIMINE_TERMINAL_REQUEST, .revision = 0}; */
 
-struct limine_terminal *terminal = NULL;
+/* struct limine_terminal *terminal = NULL; */
 
 // This might not do anything right now with .limine_reqs not
 // linked in.
@@ -286,15 +287,27 @@ void _start(void) {
   /* printf("Hello, world\n"); */
 
   // For testing: from osdev
-  term_set_color(0x1f);
-  char buf[80 * 200 + 1];
-  for (int i = 0; i < 80 * 200; ++i) {
+  /* term_set_color(0x1f); */
+  /* char buf[80 * 200 + 1]; */
+  /* for (int i = 0; i < 80 * 200; ++i) { */
+  /*   char c = (i / 80) % 10 + '0'; */
+  /*   /\* term_write(&c, 1); *\/ */
+  /*   buf[i] = c; */
+  /* } */
+  /* buf[80 * 200] = 0; */
+  /* term_writez(&buf); */
+
+  char buf[80 * 10];
+  for (int i = 0; i < 80 * 10; ++i) {
     char c = (i / 80) % 10 + '0';
-    /* term_write(&c, 1); */
     buf[i] = c;
   }
-  buf[80 * 200] = 0;
-  term_writez(&buf);
+
+  struct console_driver *console_driver = get_default_console_driver();
+  struct console *console = &console_driver->console;
+  console->cursor.color = 0x1f;
+  console_driver->handle_write(console, buf, sizeof(buf));
+
   /* video[0] = 'a'; */
   /* video[1] = 0x1f; */
   /* video[2] = 'd'; */

@@ -45,7 +45,7 @@ default_handle_slave_write(__attribute__((unused)) struct term_driver *driver,
                            char *buf, size_t sz) {
   /* Forwards the request to the console driver. */
   struct console_driver *console_driver = get_default_console_driver();
-  console_driver->handle_write(console_driver, buf, sz);
+  console_driver->handle_write(&console_driver->console, buf, sz);
 }
 static int default_handle_slave_read(struct term_driver *driver, char *buf,
                                      size_t sz) {
