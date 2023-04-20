@@ -206,7 +206,7 @@ kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
   buf[4] = ' ';
 
   struct console_driver *console_driver = get_default_console_driver();
-  console_driver->write(console_driver->dev, &buf, sizeof buf);
+  console_driver->write(console_driver->dev, buf, sizeof buf);
 
   /* _kbd_driver->kbd_irq(c); */
 
