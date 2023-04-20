@@ -1,6 +1,8 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#include <stdint.h>
+
 // Read the hardware timestamp counter. We want this to be
 // inline to decrease overhead. It may be better to have
 // this as a pure assembly function, but inline assembly
@@ -14,6 +16,16 @@ inline uint64_t read_tsc(void) {
                    :
                    : "rdx");
   return res;
+}
+
+inline void outb(uint8_t value, uint16_t port) {
+  __asm__("outb %[value], %[port]" : : [value] "a"(value), [port] "Nd"(port));
+}
+
+inline uint8_t inb(uint16_t port) {
+  uint8_t rv;
+  __asm__ volatile("inb %1, %0" : "=a"(rv) : "d"(port));
+  return rv;
 }
 
 #endif // UTIL_H

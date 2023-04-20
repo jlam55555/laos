@@ -10,7 +10,9 @@
 #include "libc.h"
 /* #include "terminal.h" */
 #include "drivers/console.h"
+#include "drivers/kbd.h"
 #include "drivers/term.h"
+#include "util.h"
 
 // The Limine requests can be placed anywhere, but it is important that
 // the compiler does not optimise them away, so, usually, they should
@@ -26,11 +28,12 @@
 /*     __attribute__((section(".limine_reqs"))) = {&terminal_request, NULL}; */
 
 static volatile int i = 0;
+static volatile char c = 0;
 static void done(void) {
   for (;;) {
     __asm__("hlt");
     if (i) {
-      printf("Got keyboard interrupt!\n");
+      /* printf("Got keyboard interrupt!\n"); */
       i = 0;
     }
   }
@@ -165,16 +168,6 @@ struct interrupt_frame {
   size_t ss;
 };
 
-static inline void outb(uint8_t value, uint16_t port) {
-  __asm__("outb %[value], %[port]" : : [value] "a"(value), [port] "Nd"(port));
-}
-
-static inline uint8_t inb(uint16_t port) {
-  uint8_t rv;
-  __asm__ volatile("inb %1, %0" : "=a"(rv) : "d"(port));
-  return rv;
-}
-
 // See https://wiki.osdev.org/8259_PIC
 #define PIC1 0x20 /* IO base address for master PIC */
 #define PIC2 0xA0 /* IO base address for slave PIC */
@@ -196,13 +189,26 @@ timer_irq(__attribute__((unused)) struct interrupt_frame *frame) {
   PIC_sendEOI(0);
 }
 
+static struct kbd_driver *_kbd_driver;
 __attribute__((interrupt)) void
 kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
   // Read scancode. (This is necessary or else the IRQ won't fire
   // again. Not sure exactly why -- may be related to:
   // https://forum.osdev.org/viewtopic.php?f=1&t=23255)
-  inb(0x60);
+  c = inb(0x60);
   ++i;
+
+  char buf[5];
+  buf[0] = '0';
+  buf[1] = 'x';
+  buf[2] = "0123456789abcdef"[(c & 0xf0) >> 4];
+  buf[3] = "0123456789abcdef"[c & 0xf];
+  buf[4] = ' ';
+
+  struct console_driver *console_driver = get_default_console_driver();
+  console_driver->write(console_driver->dev, &buf, sizeof buf);
+
+  /* _kbd_driver->kbd_irq(c); */
 
   PIC_sendEOI(0);
 }
@@ -281,9 +287,12 @@ void _start(void) {
   /* } */
   /* terminal = terminal_request.response->terminals[0]; */
 
+  // Initialize keyboard driver.
+  _kbd_driver = get_default_kbd_driver();
+
   /* run_printf_tests(); */
   /* print_gdtr_info(); */
-  /* create_keyboard_interrupt(); */
+  create_keyboard_interrupt();
 
   /* printf("Hello, world\n"); */
 

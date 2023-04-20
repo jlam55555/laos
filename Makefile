@@ -41,6 +41,9 @@ NASMFLAGS ?= -F dwarf
 # User controllable linker flags. We set none by default.
 LDFLAGS ?=
 
+# User controllable QEMU flags.
+QEMUFLAGS ?= -no-reboot -no-shutdown
+
 # Internal C flags that should not be changed by the user.
 override CFLAGS +=       \
     -std=c11             \
@@ -99,7 +102,7 @@ kernel: $(KERNEL_OUT_DIR)/$(KERNEL)
 	@ # Prevent the default cc rule from being run.
 
 # Adding debug flags to the kernel.
-kernel_debug: CFLAGS += -DDEBUG -g -save-temps
+kernel_debug: CFLAGS += -DDEBUG -g -save-temps=obj
 kernel_debug: NASMFLAGS += -DDEBUG -g
 kernel_debug: kernel
 
@@ -183,11 +186,11 @@ $(OUT_DIR)/$(IMAGE_ISO): $(KERNEL_OUT_DIR)/$(KERNEL) limine
 
 .PHONY:
 run_hdd: $(OUT_DIR)/$(IMAGE_HDD)
-	qemu-system-x86_64 $<
+	qemu-system-x86_64 $(QEMUFLAGS) $<
 
 .PHONY:
 run_iso: $(OUT_DIR)/$(IMAGE_ISO)
-	qemu-system-x86_64 $<
+	qemu-system-x86_64 $(QEMUFLAGS) $<
 
 # Remove object files and the final executable.
 .PHONY: clean
