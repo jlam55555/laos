@@ -43,13 +43,231 @@
  * userspace. Each keycode is a single byte representing a physical
  * key. These values are taken from the USB HID keyboard usage page.
  *
- * This could also be defined using an enum, but macros are used
- * as these are simple constants to be replaced at compile-time.
+ * The abbreviations are a work in progress. Common abbrevations
+ * (e.g., RET = RETURN, SHFT = SHIFT, etc.) are accepted; less-common
+ * keys are spelled out in their entirety.
+ *
+ * Future work may be to fix up some of these acronyms and to introduce
+ * aliases where appropriate.
  */
-#define KC_A 0x04
-#define KC_B 0x05
-#define KC_C 0x06
-// TODO(jlam55555): Finish this.
+enum keycode {
+  KC_A = 0x04,
+  KC_B,
+  KC_C,
+  KC_D,
+  KC_E,
+  KC_F,
+  KC_G,
+  KC_H,
+  KC_I,
+  KC_J,
+  KC_K,
+  KC_L,
+  KC_M, /* = 0x10 */
+  KC_N,
+  KC_O,
+  KC_P,
+  KC_Q,
+  KC_R,
+  KC_S,
+  KC_T,
+  KC_U,
+  KC_V,
+  KC_W,
+  KC_X,
+  KC_Y,
+  KC_Z,
+  KC_1,
+  KC_2,
+  KC_3, /* = 0x20 */
+  KC_4,
+  KC_5,
+  KC_6,
+  KC_7,
+  KC_8,
+  KC_9,
+  KC_0,
+  KC_RET,
+  KC_ESC,
+  KC_BKSP,
+  KC_TAB,
+  KC_SPACE,
+  KC_HYPHEN,
+  KC_EQUALS,
+  KC_LBRKT,
+  KC_RBRKT, /* = 0x30 */
+  KC_BKSLASH,
+  KC_POUND, /* non-US keyboards */
+  KC_SEMICOLON,
+  KC_QUOTE,
+  KC_GRAVE_ACCENT,
+  KC_COMMA,
+  KC_PERIOD,
+  KC_SLASH,
+  KC_CAPS_LOCK,
+  KC_F1,
+  KC_F2,
+  KC_F3,
+  KC_F4,
+  KC_F5,
+  KC_F6,
+  KC_F7, /* = 0x40 */
+  KC_F8,
+  KC_F9,
+  KC_F10,
+  KC_F11,
+  KC_F12,
+  KC_PRINT_SCREEN,
+  KC_SCROLL_LOCK,
+  KC_PAUSE,
+  KC_INSERT,
+  KC_HOME,
+  KC_PAGE_UP,
+  KC_DEL,
+  KC_END,
+  KC_PAGE_DOWN,
+  KC_RIGHT,
+  KC_LEFT, /* = 0x50 */
+  KC_DOWN,
+  KC_UP,
+  KC_NUM_LOCK,
+  KC_KP_DIVIDE,
+  KC_KP_MULTIPLY,
+  KC_KP_MINUS,
+  KC_KP_ADD,
+  KC_KP_ENTER,
+  KC_KP_1,
+  KC_KP_2,
+  KC_KP_3,
+  KC_KP_4,
+  KC_KP_5,
+  KC_KP_6,
+  KC_KP_7,
+  KC_KP_8, /* = 0x60 */
+  KC_KP_9,
+  KC_KP_0,
+  KC_KP_PERIOD,
+  KC_BKSLASH2, /* non-US keyboards */
+  KC_APPLICATION,
+  KC_POWER,
+  KC_KP_EQUALS,
+  KC_F13,
+  KC_F14,
+  KC_F15,
+  KC_F16,
+  KC_F17,
+  KC_F18,
+  KC_F19,
+  KC_F20,
+  KC_F21, /* = 0x70 */
+  KC_F22,
+  KC_F23,
+  KC_F24,
+  KC_EXECUTE,
+  KC_HELP,
+  KC_MENU,
+  KC_SELECT,
+  KC_STOP,
+  KC_AGAIN,
+  KC_UNDO,
+  KC_CUT,
+  KC_COPY,
+  KC_PASTE,
+  KC_FIND,
+  KC_MUTE,
+  KC_VOLUME_UP, /* = 0x80 */
+  KC_VOLUME_DOWN,
+  KC_LOCKING_CAPS_LOCK,   /* legacy */
+  KC_LOCKING_NUM_LOCK,    /* legacy */
+  KC_LOCKING_SCROLL_LOCK, /* legacy */
+  KC_KP_COMMA,
+  KC_KP_EQUALS2, /* AS/400 keyboards */
+  KC_INTERNATIONAL1,
+  KC_INTERNATIONAL2,
+  KC_INTERNATIONAL3,
+  KC_INTERNATIONAL4,
+  KC_INTERNATIONAL5,
+  KC_INTERNATIONAL6,
+  KC_INTERNATIONAL7,
+  KC_INTERNATIONAL8,
+  KC_INTERNATIONAL9,
+  KC_LANG1, /* = 0x90 */
+  KC_LANG2,
+  KC_LANG3,
+  KC_LANG4,
+  KC_LANG5,
+  KC_LANG6,
+  KC_LANG7,
+  KC_LANG8,
+  KC_LANG9,
+  KC_ALTERNATE_ERASE,
+  KC_SYSREQ,
+  KC_CANCEL,
+  KC_CLEAR,
+  KC_PRIOR,
+  KC_RETURN2,
+  KC_SEPARATOR,
+  KC_OUT, /* = 0xA0 */
+  KC_OPER,
+  KC_CLEAR_AGAIN,
+  KC_CRSEL,
+  KC_EXCEL,
+  KC_KP_00 = 0xB0, /* = 0xB0 */
+  KC_KP_000,
+  KC_THOUSANDS_SEPARATOR,
+  KC_DECIMAL_SEPARATOR,
+  KC_CURRENCY_UNIT,
+  KC_CURRENCY_SUBUNIT,
+  KC_KP_LPAREN,
+  KC_KP_RPAREN,
+  KC_KP_LBRACE,
+  KC_KP_RBRACE,
+  KC_KP_TAB,
+  KC_KP_BKSP,
+  KC_KP_A,
+  KC_KP_B,
+  KC_KP_C,
+  KC_KP_D,
+  KC_KP_E, /* = 0xC0 */
+  KC_KP_F,
+  KC_KP_XOR,
+  KC_KP_CARET,
+  KC_KP_MODULUS,
+  KC_KP_LANGBRKT,
+  KC_KP_RANGBRKT,
+  KC_KP_AMPERSAND,
+  KC_KP_DOUBLE_AMPERSAND,
+  KP_KP_BAR,
+  KC_KP_DOUBLE_BAR,
+  KC_KP_COLON,
+  KC_KP_POUND,
+  KC_KP_SPACE,
+  KC_KP_AT,
+  KC_KP_EXCLAMATION,
+  KC_KP_MEMORY_STORE, /* = 0xD0 */
+  KC_KP_MEMORY_RECALL,
+  KC_KP_MEMORY_CLEAR,
+  KC_KP_MEMORY_ADD,
+  KC_KP_MEMORY_SUBTRACT,
+  KC_KP_MEMORY_MULTIPLY,
+  KC_KP_MEMORY_DIVIDE,
+  KC_KP_PLUS_MINUS,
+  KC_KP_CLEAR,
+  KC_KP_CLEAR_ENTRY,
+  KC_KP_BINARY,
+  KC_KP_OCTAL,
+  KC_KP_DECIMAL,
+  KC_KP_HEXADECIMAL,
+  KC_LCTRL = 0xE0, /* = 0xE0 */
+  KC_LSHFT,
+  KC_LALT,
+  KC_LGUI, /* Windows key */
+  KC_RCTRL,
+  KC_RSHFT,
+  KC_RALT,
+  KC_RGUI,
+  /* 0xE8-0xFF(FF) are reserved in the USBHID spec. */
+};
 
 /**
  * Mappings from keycodes to ASCII characters. This depends on the
@@ -61,8 +279,20 @@
 extern const char kc_to_ascii_map_qwerty[256];
 extern const char kc_to_ascii_map_colemak[256];
 
-inline char kc_to_ascii(uint8_t kc, const char kc_to_ascii_map[256]) {
+inline char kc_to_ascii(enum keycode kc, const char kc_to_ascii_map[256]) {
   return kc_to_ascii_map[kc];
 }
+
+/**
+ * Combination of a keycode with an event type.
+ */
+struct kbd_event {
+  enum keycode kc;
+  enum kbd_event_type {
+    KBD_EVENT_KEYDOWN,
+    KBD_EVENT_KEYUP,
+    KBD_EVENT_KEYPRESS,
+  } type;
+};
 
 #endif // COMMON_KEYCODES_H
