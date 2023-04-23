@@ -38,6 +38,8 @@
 #ifndef COMMON_KEYCODES_H
 #define COMMON_KEYCODES_H
 
+#include <stdint.h>
+
 /**
  * Keycodes shared between the keyboard driver and applications/
  * userspace. Each keycode is a single byte representing a physical
@@ -51,6 +53,8 @@
  * aliases where appropriate.
  */
 enum keycode {
+  // Usage 0 is reserved in the USBHID spec.
+  KC_INVAL = 0x00, /* = 0x00 */
   KC_A = 0x04,
   KC_B,
   KC_C,
@@ -100,7 +104,7 @@ enum keycode {
   KC_POUND, /* non-US keyboards */
   KC_SEMICOLON,
   KC_QUOTE,
-  KC_GRAVE_ACCENT,
+  KC_BACKTICK,
   KC_COMMA,
   KC_PERIOD,
   KC_SLASH,
@@ -269,30 +273,63 @@ enum keycode {
   /* 0xE8-0xFF(FF) are reserved in the USBHID spec. */
 };
 
+// Modifier keys.
+enum keyboard_modifiers {
+  KM_CTRL = 0x01,
+  KM_SHFT = 0x02,
+  KM_ALT = 0x04,
+  KM_CAPS_LOCK = 0x08,
+  KM_NUM_LOCK = 0x10,
+  KM_SCROLL_LOCK = 0x20,
+};
+
 /**
  * Mappings from keycodes to ASCII characters. This depends on the
  * keyboard layout. A return value of -1 indicates that there is
  * no corresponding ASCII character.
- *
- * TODO(jlam55555): Fill these out.
  */
-extern const char kc_to_ascii_map_qwerty[256];
-extern const char kc_to_ascii_map_colemak[256];
-
-inline char kc_to_ascii(enum keycode kc, const char kc_to_ascii_map[256]) {
-  return kc_to_ascii_map[kc];
-}
+extern const char kc_to_ascii_map_qwerty[2][256];
+extern const char kc_to_ascii_map_colemak[2][256];
 
 /**
  * Combination of a keycode with an event type.
  */
 struct kbd_event {
   enum keycode kc;
+  uint8_t km;
+  char ascii;
   enum kbd_event_type {
     KBD_EVENT_KEYDOWN,
     KBD_EVENT_KEYUP,
     KBD_EVENT_KEYPRESS,
   } type;
 };
+
+/**
+ * Generate an ASCII character for a keyboard event.
+ *
+ * Notes:
+ * - This takes as argument a keyboard event rather than a keycode,
+ *   because some ASCII characters depend on multiple keys. (For example,
+ *   the Shift key modifies the ASCII output).
+ * - This also takes a keyboard mapping (keyboard layout) argument.
+ * - This (currently) does not generate special ASCII characters for
+ *   terminal control sequences (e.g., ^A-^Z, ^@, etc.), nor does it
+ *   generate any escape sequences (such as the escape sequence when
+ *   pressing an arrow key) other than the Escape key itself (\e).
+ *   This hopefully will be implemented in the future.
+ *
+ * TODO(jlam55555): create another utility function that does the same
+ *   but does generate the correct escape sequences for the terminal.
+ *   This will probably require more kc_to_ascii maps, potentially mapping
+ *   to multi-character escape sequences (strings).
+ */
+inline char kc_to_ascii(struct kbd_event *evt,
+                        const char kc_to_ascii_map[2][256]) {
+  // TODO(jlam55555): Handle Num Lock.
+  // TODO(jlam55555): Handle control sequences correctly.
+  int shift = !!(evt->km & evt->km & KM_CAPS_LOCK) ^ !!(evt->km & KM_SHFT);
+  return evt->ascii = kc_to_ascii_map[shift][evt->kc];
+}
 
 #endif // COMMON_KEYCODES_H

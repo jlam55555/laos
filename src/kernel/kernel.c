@@ -198,17 +198,17 @@ kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
   c = inb(0x60);
   ++i;
 
-  char buf[5];
-  buf[0] = '0';
-  buf[1] = 'x';
-  buf[2] = "0123456789abcdef"[(c & 0xf0) >> 4];
-  buf[3] = "0123456789abcdef"[c & 0xf];
-  buf[4] = ' ';
+  /* char buf[5]; */
+  /* buf[0] = '0'; */
+  /* buf[1] = 'x'; */
+  /* buf[2] = "0123456789abcdef"[(c & 0xf0) >> 4]; */
+  /* buf[3] = "0123456789abcdef"[c & 0xf]; */
+  /* buf[4] = ' '; */
 
-  struct console_driver *console_driver = get_default_console_driver();
-  console_driver->write(console_driver->dev, buf, sizeof buf);
+  /* struct console_driver *console_driver = get_default_console_driver(); */
+  /* console_driver->write(console_driver->dev, buf, sizeof buf); */
 
-  /* _kbd_driver->kbd_irq(c); */
+  _kbd_driver->kbd_irq(c);
 
   PIC_sendEOI(0);
 }
