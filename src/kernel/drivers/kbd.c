@@ -308,11 +308,32 @@ static struct kbd_event _generate_kbd_evt(enum keycode kc, bool is_make) {
   enum kbd_event_type type =
       is_make ? (_pressed_kc_map[type] ? KBD_EVENT_KEYUP : KBD_EVENT_KEYDOWN)
               : KBD_EVENT_KEYUP;
-  _pressed_kc_map[kc] = is_make;
+  // Non-toggle key.
+  if (kc != KC_CAPS_LOCK && kc != KC_SCROLL_LOCK && kc != KC_NUM_LOCK) {
+    _pressed_kc_map[kc] = is_make;
+  }
+  // Caps/Scroll/Num-lock toggle key (on keydown event).
+  // TODO(jlam55555): Note that we may need an override if any of these keys
+  //    are mapped to other keys. For example, in Colemak the Caps Lock key
+  //    is mapped to backspace, which means that we don't want a toggle
+  //    behavior. This is relatively niche though, and could also be solved
+  //    in userspace. The easiest way to solve this may be to have a list of
+  //    toggle/lock keys for each keyboard layout, along with which bit they
+  //    toggle in the keyboard modifiers byte (out of bytes 3-7).
+  else {
+    _pressed_kc_map[kc] =
+        type == KBD_EVENT_KEYDOWN ? !_pressed_kc_map[kc] : _pressed_kc_map[kc];
+  }
+  uint8_t modifiers =
+      ((_pressed_kc_map[KC_LCTRL] || _pressed_kc_map[KC_RCTRL]) ? KM_CTRL : 0) |
+      ((_pressed_kc_map[KC_LSHFT] || _pressed_kc_map[KC_RSHFT]) ? KM_SHFT : 0) |
+      ((_pressed_kc_map[KC_LALT] || _pressed_kc_map[KC_RALT]) ? KM_ALT : 0) |
+      (_pressed_kc_map[KC_CAPS_LOCK] ? KM_CAPS_LOCK : 0) |
+      (_pressed_kc_map[KC_SCROLL_LOCK] ? KM_SCROLL_LOCK : 0) |
+      (_pressed_kc_map[KC_NUM_LOCK] ? KM_NUM_LOCK : 0);
   struct kbd_event evt = {
       .kc = kc,
-      .km = 0 /* TODO(jlam55555): Handle this. */,
-      .ascii = 'a',
+      .km = modifiers,
       .type = type,
   };
   kc_to_ascii(&evt, kc_to_ascii_map_qwerty);
@@ -323,7 +344,8 @@ static struct kbd_event _generate_kbd_evt(enum keycode kc, bool is_make) {
 struct term_driver *_term_driver;
 static void _handle_evt(struct kbd_event evt) {
   // TODO(jlam55555): Convert special characters, such as arrow keys,
-  //    into multi-byte ascii codes.
+  //    into multi-byte ascii codes. Also control keys and alt keys.
+  // TODO(jlam55555): Handle *_LOCK keys.
   if (evt.type != KBD_EVENT_KEYUP && evt.ascii >= 0) {
     _term_driver->master_write(_term_driver->dev, &evt.ascii, 1);
   }
