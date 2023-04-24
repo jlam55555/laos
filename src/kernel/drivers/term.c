@@ -23,9 +23,9 @@ size_t term_ringbuf_read(struct term_ringbuf *rb, char *buf, size_t sz) {
 }
 
 static char *_ctrl_chars[31] = {
-    "^@", "^A", "^B", "^C", "^D", "^E", "^F", "^G", "^H", "^I", "^J",
-    "^K", "^L", "^M", "^N", "^O", "^P", "^Q", "^R", "^S", "^T", "^U",
-    "^V", "^W", "^X", "^Y", "^Z", "^[", "^]", "^^", "^_",
+    "^@", "^A", "^B", "^C", "^D", "^E", "^F",  "^G", "^H", "^I", "^J",
+    "^K", "^L", "^M", "^N", "^O", "^P", "^Q",  "^R", "^S", "^T", "^U",
+    "^V", "^W", "^X", "^Y", "^Z", "^[", "^\\", "^]", "^^", "^_",
 };
 
 // Currently implementing a very simple raw-mode (i.e., no ldisc/cooked mode)
@@ -40,7 +40,10 @@ static void _master_write(struct term *term, char *buf, size_t sz) {
       if (isprint(buf[i]) || buf[i] < 0) {
         term->driver->slave_write(term, buf + i, 1);
       } else {
-        term->driver->slave_write(term, _ctrl_chars[buf[i]], 2);
+        char tmp_buf[2];
+        tmp_buf[0] = '^';
+        tmp_buf[1] = buf[i] + 0x40;
+        term->driver->slave_write(term, tmp_buf, 2);
       }
     }
   }

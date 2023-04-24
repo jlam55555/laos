@@ -306,28 +306,30 @@ struct kbd_event {
 };
 
 /**
- * Generate an ASCII character for a keyboard event.
+ * Generate an ASCII character for a keyboard event, or -1 for a non-ASCII
+ * character. Takes the Shift, Caps Lock, and Num Lock modifier keys into
+ * account, and ignores other modifiers keys.
  *
  * Notes:
  * - This takes as argument a keyboard event rather than a keycode,
  *   because some ASCII characters depend on multiple keys. (For example,
  *   the Shift key modifies the ASCII output).
  * - This also takes a keyboard mapping (keyboard layout) argument.
- * - This (currently) does not generate special ASCII characters for
- *   terminal control sequences (e.g., ^A-^Z, ^@, etc.), nor does it
- *   generate any escape sequences (such as the escape sequence when
- *   pressing an arrow key) other than the Escape key itself (\e).
- *   This hopefully will be implemented in the future.
+ * - This doesn't generate special textual representations for non-printable
+ *   ASCII characters (0x00 to 0x1F, corresponding to ^@ to ^_), nor does it
+ *   generate ANSI escape sequences for special keycodes (e.g., cursor arrow
+ *   keys or the Insert key). The former capability is implemented in the
+ *   terminal ECHO, and the second is implemented in the keyboard driver
+ *   callback for the terminal (which may be moved to a more generic input
+ *   subsystem).
  *
- * TODO(jlam55555): create another utility function that does the same
- *   but does generate the correct escape sequences for the terminal.
- *   This will probably require more kc_to_ascii maps, potentially mapping
- *   to multi-character escape sequences (strings).
+ * TODO(jlam55555): Handle Num Lock, and fix Caps Lock behavior (which
+ *     shouldn't behave the same as Shift). This may require two more
+ *     keymaps for each keyboard layout.
+ * TODO(jlam55555): Make a keyboard layout into a struct.
  */
 inline char kc_to_ascii(struct kbd_event *evt,
                         const char kc_to_ascii_map[2][256]) {
-  // TODO(jlam55555): Handle Num Lock.
-  // TODO(jlam55555): Handle control sequences correctly.
   int shift = !!(evt->km & evt->km & KM_CAPS_LOCK) ^ !!(evt->km & KM_SHFT);
   return evt->ascii = kc_to_ascii_map[shift][evt->kc];
 }
