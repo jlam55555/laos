@@ -33,11 +33,13 @@ static char *_ctrl_chars[31] = {
 static void _master_write(struct term *term, char *buf, size_t sz) {
   if (term->echo) {
     // Convert control sequences to the carat (^X) form.
+    // We don't expect ASCII values less than zero, but we print
+    // them out if we do. Otherwise we would be accessing negative
+    // indices in the _ctrl_chars array.
     for (size_t i = 0; i < sz; ++i) {
-      if (isprint(buf[i])) {
+      if (isprint(buf[i]) || buf[i] < 0) {
         term->driver->slave_write(term, buf + i, 1);
       } else {
-        // Two-character control character.
         term->driver->slave_write(term, _ctrl_chars[buf[i]], 2);
       }
     }
