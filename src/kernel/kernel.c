@@ -5,9 +5,9 @@
 
 #include "arch/x86_64/registers.h"
 /* #include "bios_reqs.h" */
+#include "common/libc.h"
 #include "gdt.h"
 #include "idt.h"
-#include "libc.h"
 /* #include "terminal.h" */
 #include "drivers/console.h"
 #include "drivers/kbd.h"

@@ -322,12 +322,10 @@ static struct kbd_event _generate_kbd_evt(enum keycode kc, bool is_make) {
 // Customizable keyboard event handler, called by the IRQ.
 struct term_driver *_term_driver;
 static void _handle_evt(struct kbd_event evt) {
-  // TODO(jlam55555): Handle printing of special keys, such as Ctrl+*
-  //    key combinations. This should be delegated to the terminal
-  //    driver, so perhaps the terminal driver's master_write can be
-  //    changed to accept a keyboard event.
-  if (evt.type != KBD_EVENT_KEYUP && evt.ascii != -1) {
-    _term_driver->master_write(_term_driver->dev, (char *)&evt.ascii, 1);
+  // TODO(jlam55555): Convert special characters, such as arrow keys,
+  //    into multi-byte ascii codes.
+  if (evt.type != KBD_EVENT_KEYUP && evt.ascii >= 0) {
+    _term_driver->master_write(_term_driver->dev, &evt.ascii, 1);
   }
 }
 

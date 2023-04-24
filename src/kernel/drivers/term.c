@@ -1,5 +1,6 @@
-#include "term.h"
-#include "console.h"
+#include "drivers/term.h"
+#include "common/libc.h"
+#include "drivers/console.h"
 
 void term_ringbuf_init(struct term_ringbuf *rb) {
   rb->size = 0;
@@ -21,9 +22,25 @@ size_t term_ringbuf_read(struct term_ringbuf *rb, char *buf, size_t sz) {
   return i;
 }
 
+static char *_ctrl_chars[31] = {
+    "^@", "^A", "^B", "^C", "^D", "^E", "^F", "^G", "^H", "^I", "^J",
+    "^K", "^L", "^M", "^N", "^O", "^P", "^Q", "^R", "^S", "^T", "^U",
+    "^V", "^W", "^X", "^Y", "^Z", "^[", "^]", "^^", "^_",
+};
+
+// Currently implementing a very simple raw-mode (i.e., no ldisc/cooked mode)
+// terminal.
 static void _master_write(struct term *term, char *buf, size_t sz) {
   if (term->echo) {
-    term->driver->slave_write(term, buf, sz);
+    // Convert control sequences to the carat (^X) form.
+    for (size_t i = 0; i < sz; ++i) {
+      if (isprint(buf[i])) {
+        term->driver->slave_write(term, buf + i, 1);
+      } else {
+        // Two-character control character.
+        term->driver->slave_write(term, _ctrl_chars[buf[i]], 2);
+      }
+    }
   }
 
   term_ringbuf_write(&term->mts_buf, buf, sz);

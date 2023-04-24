@@ -2,7 +2,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "libc.h"
+#include "common/libc.h"
+
+bool isprint(char c) { return c >= 32; }
 
 size_t strlen(char *s) {
   char *it = s;
