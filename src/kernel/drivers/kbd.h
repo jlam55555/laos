@@ -23,8 +23,8 @@
  * - USB HID keyboard usage codes (used as a keycode standard, since PS/2
  * doesn't define one): https://usb.org/sites/default/files/hut1_3_0.pdf#page=89
  */
-#ifndef KBD_H
-#define KBD_H
+#ifndef DRIVERS_KBD_H
+#define DRIVERS_KBD_H
 
 #include <stdint.h>
 
@@ -41,4 +41,4 @@ struct kbd_driver *get_default_kbd_driver(void);
 //    It doesn't have to be in the public interface though.
 // TODO(jlam55555): Improve the PS/2 controller/keyboard setup.
 
-#endif // KBD_H
+#endif // DRIVERS_KBD_H

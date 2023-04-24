@@ -6,8 +6,8 @@
  * The default console driver provides a simple vertical
  * scrolling capability with a constant scrollback size.
  */
-#ifndef CONSOLE_H
-#define CONSOLE_H
+#ifndef DRIVERS_CONSOLE_H
+#define DRIVERS_CONSOLE_H
 
 #include <stddef.h>
 
@@ -72,4 +72,4 @@ struct console_driver {
 
 struct console_driver *get_default_console_driver(void);
 
-#endif // CONSOLE_H
+#endif // DRIVERS_CONSOLE_H

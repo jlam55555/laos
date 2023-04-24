@@ -1,4 +1,5 @@
 #include "drivers/term.h"
+
 #include "common/libc.h"
 #include "drivers/console.h"
 

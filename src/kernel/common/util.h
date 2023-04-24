@@ -1,5 +1,5 @@
-#ifndef UTIL_H
-#define UTIL_H
+#ifndef COMMON_UTIL_H
+#define COMMON_UTIL_H
 
 #include <stdint.h>
 
@@ -28,4 +28,4 @@ inline uint8_t inb(uint16_t port) {
   return rv;
 }
 
-#endif // UTIL_H
+#endif // COMMON_UTIL_H

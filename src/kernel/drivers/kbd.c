@@ -1,8 +1,9 @@
-#include "kbd.h"
+#include "drivers/kbd.h"
+
 #include "common/keycodes.h"
-#include "console.h"
-#include "term.h"
-#include "util.h"
+#include "common/util.h"
+#include "drivers/console.h"
+#include "drivers/term.h"
 
 // Port address for PS/2 keyboard.
 #define PS2_KBD_PORT 0x64
@@ -15,18 +16,27 @@
 #define PS2_KBD_ACK 0xFA
 #define PS2_KBD_RESEND 0xFE
 
-// TODO(jlam55555): For now, we assume single-byte scancodes.
-//    We need to handle multi-byte scancodes soon.
-//    Ignore print screen and pause for now; these will be
-//    Handled separately.
-//    This is for scan code set 1 only.
-// Notes for scan set 1:
-// - For single-byte codes, the keypress scancodes lie
-//   between 0x01 and 0x58, and the keyup scancodes lie
-//   between 0x81 and 0xD8 (shifted up by 0x80).
-// - There are large gaps at 0x59-0x80 and 0xD9-0xFF, presumably
-//   because there are special PS/2 keyboard bytes in that range
-//   (e.g., 0xE0, 0xFA, etc.)
+/**
+ * Mapping from scancodes to keycodes for scancode set 1.
+ * The sign of the value indicates whether it is a make or
+ * break code; positive values indicate make codes, and
+ * negative values indicate break codes. The value KC_INVAL
+ * (0x00) indicates a scancode that doesn't map to a keycode.
+ *
+ * Notes for scan set 1:
+ * - For single-byte codes, the keypress scancodes lie
+ *   between 0x01 and 0x58, and the keyup scancodes lie
+ *   between 0x81 and 0xD8 (shifted up by 0x80).
+ * - There are large gaps at 0x59-0x80 and 0xD9-0xFF, presumably
+ *   because there are special PS/2 keyboard bytes in that range
+ *   (e.g., 0xE0, 0xFA, etc.)
+ *
+ * TODO(jlam55555): For now, we assume single-byte scancodes.
+ *    We need to handle multi-byte scancodes soon.
+ *    Ignore print screen and pause for now; these will be
+ *    Handled separately.
+ *    This is for scan code set 1 only.
+ */
 static const int16_t _sc_to_kc_map[256] = {
     /* 0x00 */
     KC_INVAL, KC_ESC, KC_1, KC_2, KC_3, KC_4, KC_5, KC_6, KC_7, KC_8, KC_9,
@@ -173,7 +183,6 @@ static void _kbd_irq(uint8_t data) {
 
   // TODO(jlam55555): Keep reading until the end of the scancode sequence.
   // TODO(jlam55555): Handle multi-byte scancodes.
-  // TODO(jlam55555): Handle keys that toggle state, e.g., Caps Lock.
   int16_t kc_make_break = _sc_to_kc_map[data];
   bool is_make = kc_make_break >= 0;
   enum keycode kc = is_make ? kc_make_break : -kc_make_break;
@@ -185,6 +194,7 @@ static void _kbd_irq(uint8_t data) {
 
   struct kbd_event evt = _generate_kbd_evt(kc, is_make);
 
+  // Similar to input_report_key() in Linux.
   _handle_evt(evt);
 }
 

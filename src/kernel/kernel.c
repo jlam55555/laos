@@ -6,13 +6,13 @@
 #include "arch/x86_64/registers.h"
 /* #include "bios_reqs.h" */
 #include "common/libc.h"
+#include "common/util.h"
 #include "gdt.h"
 #include "idt.h"
 /* #include "terminal.h" */
 #include "drivers/console.h"
 #include "drivers/kbd.h"
 #include "drivers/term.h"
-#include "util.h"
 
 // The Limine requests can be placed anywhere, but it is important that
 // the compiler does not optimise them away, so, usually, they should

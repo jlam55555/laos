@@ -12,8 +12,8 @@
  * the terminal driver (but instead called at some higher layer
  * in the stack, such as a devfs filesystem abstaction layer).
  */
-#ifndef TERM_H
-#define TERM_H
+#ifndef DRIVERS_TERM_H
+#define DRIVERS_TERM_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -57,8 +57,6 @@ struct term_driver {
   int (*slave_read)(struct term *, char *, size_t);
 };
 
-// TODO: make it into a factory function that
-// can perform init if necessary.
 struct term_driver *get_default_term_driver(void);
 
-#endif // TERM_H
+#endif // DRIVERS_TERM_H
