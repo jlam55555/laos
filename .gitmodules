@@ -1,5 +1,5 @@
 [submodule "limine"]
 	path = src/limine
-	url = https://github.com/limine-bootloader/limine.git
-	branch = v4.x-branch-binary
+	url = http://github.com/jlam55555/limine.git
+	branch = trunk
         shallow = true
