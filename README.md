@@ -7,16 +7,27 @@ A personal study on operating systems, with help from the OSDev Wiki. A long-ter
 Make sure to have [QEMU][qemu] and [GNU `make`][make] installed.
 
 ```bash
-# Fetch Limine dependency
-git submodule init
-git submodule update
+# Fetch Limine (bootloader) dependency.
+git submodule update --init
 
-# Build and run either iso or hdd
-make run_iso
-make run_hdd
+# Build Limine (this build is separate from the kernel build)
+make limine
+
+# Build and run in QEMU (run_iso target also available)
+sudo make run_hdd
+
+# Cleanup
+sudo make limine-clean clean
 ```
 
-See the [Makefile](./Makefile) for more possible build targets.
+### Features
+- [X] Limine bootloader (forked to jlam55555/limine to enable VGA text mode 3 by default)
+- [X] PS/2 Keyboard driver: read scancodes, translate to keycodes/ASCII and pass to input subsystem
+- [X] TTY layer: master side reads from input subsystem, writes to console; slave side can be used by processes; no ldisc/cooked mode
+- [X] Console driver: write text to screen, with scrollback; interpret special characters like `^H`, `^M`, `^J`
+- [ ] Shell
+- [ ] Processes
+- [ ] Memory management
 
 ### Learning goals
 
