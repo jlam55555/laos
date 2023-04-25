@@ -95,7 +95,7 @@ static bool _pressed_kc_map[256] = {};
  */
 static struct kbd_event _generate_kbd_evt(enum keycode kc, bool is_make) {
   enum kbd_event_type type =
-      is_make ? (_pressed_kc_map[type] ? KBD_EVENT_KEYUP : KBD_EVENT_KEYDOWN)
+      is_make ? (_pressed_kc_map[kc] ? KBD_EVENT_KEYPRESS : KBD_EVENT_KEYDOWN)
               : KBD_EVENT_KEYUP;
   // Non-toggle key.
   if (kc != KC_CAPS_LOCK && kc != KC_SCROLL_LOCK && kc != KC_NUM_LOCK) {
@@ -269,7 +269,7 @@ static void _ps2_kbd_set_scancodeset(uint8_t scancodeset) {
   _ps2_kbd_wait_for_input();
   outb(scancodeset, PS2_KBD_PORT);
   _ps2_kbd_wait_for_output();
-  return inb(PS2_KBD_PORT);
+  inb(PS2_KBD_PORT);
 }
 
 static void _driver_init(__attribute__((unused)) struct kbd_driver *driver) {

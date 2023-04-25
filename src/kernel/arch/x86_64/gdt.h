@@ -1,5 +1,13 @@
-#ifndef GDT_H
-#define GDT_H
+/**
+ * Global Descriptor Table (GDT) data structure for segment
+ * protections on the x86_64 architecture.
+ *
+ * Luckily Limine sets this up with reasonable defaults. The
+ * definitions below may be used to print out diagnostic
+ * information about the GDT.
+ */
+#ifndef ARCH_X86_64_GDT_H
+#define ARCH_X86_64_GDT_H
 
 struct gdtr_desc {
   uint16_t sz;
@@ -36,4 +44,4 @@ inline void read_gdt(struct gdtr_desc *gdtr) {
   __asm__ volatile("sgdt %0" : "=m"(*gdtr));
 }
 
-#endif // GDT_H
+#endif // ARCH_X86_64_GDT_H
