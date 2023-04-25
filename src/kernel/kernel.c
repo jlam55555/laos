@@ -5,12 +5,13 @@
 
 #include "arch/x86_64/interrupt.h"
 #include "common/util.h"
-#include "drivers/console.h"
+#include "diag/shell.h"
 #include "drivers/kbd.h"
 
 static void _done(void) {
   for (;;) {
     __asm__("hlt");
+    shell_on_interrupt();
   }
 }
 
@@ -44,10 +45,8 @@ void _start(void) {
   create_interrupt_gate(&gates[33], _kb_irq);
   init_interrupts();
 
-  // Set console properties.
-  struct console_driver *console_driver = get_default_console_driver();
-  struct console *console = console_driver->dev;
-  console->cursor.color = 0x1f;
+  // Simple diagnostic shell.
+  shell_init();
 
   // We're done, just wait for interrupt...
   _done();
