@@ -30,15 +30,83 @@
 
 #include "common/keycodes.h"
 
+/**
+ * I/O port addresses for PS/2 keyboard and keyboard controller.
+ */
+#define PS2_KBD_PORT 0x60
+#define PS2_KBDCTRL_PORT 0x64
+
+/**
+ * PS/2 status register flags. The status register
+ * is read from PS2_KBD_CONTROLLER_PORT.
+ *
+ * Currently, only the first two bytes are used
+ * when polling data or attempting to write data.
+ */
+#define PS2_KBDCTRL_STATUS_OUT 0x01
+#define PS2_KBDCTRL_STATUS_IN 0x02
+#define PS2_KBDCTRL_STATUS_SYSTEM 0x04
+#define PS2_KBDCTRL_STATUS_CMD_DATA 0x08
+#define PS2_KBDCTRL_STATUS_RESERVED 0x10
+#define PS2_KBDCTRL_STATUS_RESERVED2 0x20
+#define PS2_KBDCTRL_STATUS_TIMEOUT 0x40
+#define PS2_KBDCTRL_STATUS_PARITY 0x80
+
+/**
+ * PS/2 keyboard controller configuration byte flags.
+ */
+#define PS2_KBDCTRL_CONFIG_INTR1 0x01
+#define PS2_KBDCTRL_CONFIG_INTR2 0x02
+#define PS2_KBDCTRL_CONFIG_SYSTEM 0x04
+#define PS2_KBDCTRL_CONFIG_ZERO 0x08
+#define PS2_KBDCTRL_CONFIG_CLK1 0x10
+#define PS2_KBDCTRL_CONFIG_CLK2 0x20
+#define PS2_KBDCTRL_CONFIG_TRANSLATE 0x40
+#define PS2_KBDCTRL_CONFIG_ZERO2 0x80
+
+/**
+ * Commands to send to PS2_KBDCTRL_PORT.
+ */
+#define PS2_KBDCTRL_CMD_GET_CONFIG 0x20
+#define PS2_KBDCTRL_CMD_SET_CONFIG 0x60
+
+/**
+ * Commands to send to PS2_KBD_PORT.
+ */
+#define PS2_KBD_CMD_SCANCODESET 0xF0
+
+/**
+ * Special return codes read from PS2_KBD_PORT.
+ */
+#define PS2_KBD_ACK 0xFA
+#define PS2_KBD_RESEND 0xFE
+
+/**
+ * Scan code set ID's. These values assume that bit 6 of
+ * the PS/2 controller configuration byte is unset.
+ */
+#define PS2_KBD_SCANCODESET1 1
+#define PS2_KBD_SCANCODESET2 2
+#define PS2_KBD_SCANCODESET3 3
+
 struct kbd_driver {
+  /**
+   * Initializes the keyboard driver. This may perform some
+   * PS/2 commands that may trigger interrupts, but these interrupts
+   * shouldn't be handled by the kbd_irq handler. Thus, interrupts
+   * should be disabled during initialization. (Any I/O in the
+   * initialization will utilize polling to ensure that data is ready.)
+   */
   void (*driver_init)(struct kbd_driver *);
+
+  /**
+   * Keyboard IRQ handler. This receives a scancode byte, and should
+   * report keycodes to the input subsystem. (Currently, it sends events
+   * directly to the terminal driver in lieu of a full input subsystem.)
+   */
   void (*kbd_irq)(uint8_t);
 };
 
 struct kbd_driver *get_default_kbd_driver(void);
-
-// TODO(jlam55555): Add utilities to convert scancodes to keycodes.
-//    It doesn't have to be in the public interface though.
-// TODO(jlam55555): Improve the PS/2 controller/keyboard setup.
 
 #endif // DRIVERS_KBD_H

@@ -58,8 +58,7 @@ static void _console_refresh(struct console *console) {
 
 static void _console_advance(struct console *, bool);
 static void _console_putchar(struct console *console, char c, bool refresh) {
-  // TODO(jlam55555): Implement special handling for newline
-  //    and other special characters.
+  // TODO(jlam55555): Implement special handling for ^J, ^M, ^H.
 
   // Update the scrollback buffer.
   struct console_cursor *cur = &console->cursor;
