@@ -31,7 +31,10 @@ static void _master_write(struct term *term, char *buf, size_t sz) {
     // We don't expect ASCII values less than zero, but we print
     // them out if we receive them.
     for (size_t i = 0; i < sz; ++i) {
-      if (isprint(buf[i]) || buf[i] < 0) {
+      // For terminals, ^J, ^M, and ^H are passed through normally. Other
+      // characters are converted to control-sequence notation.
+      if (isprint(buf[i]) || buf[i] < 0 || buf[i] == '\n' || buf[i] == '\r' ||
+          buf[i] == '\b') {
         term->driver->slave_write(term, buf + i, 1);
       } else {
         char tmp_buf[2];
@@ -50,11 +53,11 @@ static int _master_read(__attribute__((unused)) struct term *term,
   /* Noop; _slave_write() will call the console driver */
   return 0;
 }
+static struct console_driver *_console_driver;
 static void _slave_write(__attribute__((unused)) struct term *term, char *buf,
                          size_t sz) {
   /* Forwards the request to the console driver. */
-  struct console_driver *console_driver = get_default_console_driver();
-  console_driver->write(console_driver->dev, buf, sz);
+  _console_driver->write(_console_driver->dev, buf, sz);
 }
 static int _slave_read(struct term *term, char *buf, size_t sz) {
   return term_ringbuf_read(&term->mts_buf, buf, sz);
@@ -67,6 +70,7 @@ static void _driver_init(struct term_driver *driver) {
   driver->dev->driver = driver;
   term_ringbuf_init(&driver->dev->mts_buf);
   term_ringbuf_init(&driver->dev->stm_buf);
+  _console_driver = get_default_console_driver();
 }
 static struct term_driver default_term_driver = {
     .driver_init = _driver_init,
