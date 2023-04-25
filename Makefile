@@ -1,6 +1,7 @@
 SRC_DIR := src
 OUT_DIR := out
-LIMINE_DIR := $(SRC_DIR)/limine
+LIMINE_SRC_DIR := $(SRC_DIR)/limine
+LIMINE_DIR := $(LIMINE_SRC_DIR)/bin
 KERNEL_SRC_DIR := $(SRC_DIR)/kernel
 KERNEL_OUT_DIR := $(OUT_DIR)/kernel
 
@@ -124,9 +125,17 @@ $(KERNEL_OUT_DIR)/%.o: $(KERNEL_SRC_DIR)/%.asm
 	mkdir -p $(shell dirname "$@")
 	nasm $(NASMFLAGS) $< -o $@
 
-.PHONY: limine
-limine:
-	make -C $(LIMINE_DIR)
+$(LIMINE_DIR)/limine:
+	$(LIMINE_SRC_DIR)/bootstrap
+	(cd $(LIMINE_SRC_DIR) && ./configure --enable-all --disable-uefi-aarch64)
+	make -j16 -C $(LIMINE_SRC_DIR)
+
+limine: $(LIMINE_DIR)/limine
+	@ # Don't run the default rule.
+
+.PHONY: limine-clean
+limine-clean:
+	make -C $(LIMINE_SRC_DIR) clean
 
 .ONESHELL:
 $(OUT_DIR)/$(IMAGE_HDD): $(KERNEL_OUT_DIR)/$(KERNEL) limine
@@ -138,7 +147,7 @@ $(OUT_DIR)/$(IMAGE_HDD): $(KERNEL_OUT_DIR)/$(KERNEL) limine
 	parted -s $@ mkpart ESP fat32 2048s 100%
 	parted -s $@ set 1 esp on
 	# Install the Limine BIOS stages onto the image.
-	$(LIMINE_DIR)/limine-deploy $@
+	$(LIMINE_DIR)/limine bios-install $@
 	# Mount the loopback device.
 	USED_LOOPBACK=$$(sudo losetup -Pf --show $@)
 	# Format the ESP partition as FAT32.
@@ -182,7 +191,7 @@ $(OUT_DIR)/$(IMAGE_ISO): $(KERNEL_OUT_DIR)/$(KERNEL) limine
 		$(OUT_DIR)/iso_root \
 		-o $@
 	# Install Limine stage 1 and 2 for legacy BIOS boot.
-	$(LIMINE_DIR)/limine-deploy $@
+	$(LIMINE_DIR)/limine bios-install $@
 
 .PHONY:
 run_hdd: $(OUT_DIR)/$(IMAGE_HDD)
