@@ -1,8 +1,10 @@
+#include "common/libc.h"
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include "common/libc.h"
+#include "drivers/term.h"
 
 bool isprint(char c) { return c >= 32; }
 
@@ -192,9 +194,26 @@ size_t _itoa(char *buf, int64_t val) {
   return i;
 }
 
-typedef void (*writer_t)(char c, char *buf, size_t i, size_t buf_sz);
+/**
+ * Interface for writer functions. There are currently two implementors:
+ * - _buf_writer: write character to a buffer. Null-terminate.
+ * - _term_writer: write character to a terminal-like object. Do not
+ *     null-terminate.
+ *
+ * Arguments:
+ * - c:         Character to write
+ * - buf:       Buffer to write to, if applicable
+ * - i:         Position in buffer to write to, if applicable
+ * - buf_sz:    Size of buffer to write to, if applicable
+ * - null_term: If this is a null-terminating character. We need to keep
+ *              track of this since it's possible to have valid null
+ *              characters within a (non-C-style) string buffer.
+ */
+typedef void (*writer_t)(char c, char *buf, size_t i, size_t buf_sz,
+                         bool null_term);
 
-static inline void _buf_writer(char c, char *buf, size_t i, size_t buf_sz) {
+static inline void _buf_writer(char c, char *buf, size_t i, size_t buf_sz,
+                               __attribute__((unused)) bool null_term) {
   if (i >= buf_sz) {
     return;
   }
@@ -203,8 +222,13 @@ static inline void _buf_writer(char c, char *buf, size_t i, size_t buf_sz) {
 
 static inline void _term_writer(char c, __attribute__((unused)) char *_buf,
                                 __attribute__((unused)) size_t _i,
-                                __attribute__((unused)) size_t _buf_sz) {
-  /* terminal_request.response->write(terminal, &c, 1); */
+                                __attribute__((unused)) size_t _buf_sz,
+                                bool null_term) {
+  if (null_term) {
+    return;
+  }
+  struct term_driver *term_driver = get_default_term_driver();
+  term_driver->slave_write(term_driver->dev, &c, 1);
 }
 
 // This returns the number of characters that would be printed
@@ -229,13 +253,13 @@ static size_t _vsnprintf(writer_t write, char *buf, size_t n, char *fmt,
       // Handle format specifier.
       switch (fs.type) {
       case FS_PCT:
-        write('%', buf, j++, n);
+        write('%', buf, j++, n, false);
         break;
       case FS_CHAR:
         // Note: char is promoted to int if passed as a vararg;
         // the program will abort if char is used.
         c = va_arg(va, int);
-        write(c, buf, j++, n);
+        write(c, buf, j++, n, false);
         break;
       case FS_BINARY:
       case FS_OCTAL:
@@ -269,7 +293,7 @@ static size_t _vsnprintf(writer_t write, char *buf, size_t n, char *fmt,
         }
         len = _utoa(scratch, u, radix);
         for (k = 0; k < len; ++k) {
-          write(scratch[k], buf, j++, n);
+          write(scratch[k], buf, j++, n, false);
         }
         break;
       case FS_SIGNED:
@@ -286,12 +310,12 @@ static size_t _vsnprintf(writer_t write, char *buf, size_t n, char *fmt,
         }
         len = _itoa(scratch, d);
         for (k = 0; k < len; ++k) {
-          write(scratch[k], buf, j++, n);
+          write(scratch[k], buf, j++, n, false);
         }
         break;
       case FS_STR:
         for (s = va_arg(va, char *); *s; ++s) {
-          write(*s, buf, j++, n);
+          write(*s, buf, j++, n, false);
         }
         break;
       case FS_INVAL:
@@ -300,12 +324,12 @@ static size_t _vsnprintf(writer_t write, char *buf, size_t n, char *fmt,
     }
     // Not a format specifier.
     else {
-      write(fmt[i++], buf, j++, n);
+      write(fmt[i++], buf, j++, n, false);
     }
   }
 
   // Null-terminate.
-  write('\0', buf, j < n ? j : n - 1, n);
+  write('\0', buf, j < n ? j : n - 1, n, true);
   return j;
 }
 
