@@ -1,8 +1,10 @@
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 
-#include "bios_reqs.h"
-#include "libc.h"
+#include "common/libc.h"
+
+bool isprint(char c) { return c >= 32; }
 
 size_t strlen(char *s) {
   char *it = s;
@@ -202,7 +204,7 @@ static inline void _buf_writer(char c, char *buf, size_t i, size_t buf_sz) {
 static inline void _term_writer(char c, __attribute__((unused)) char *_buf,
                                 __attribute__((unused)) size_t _i,
                                 __attribute__((unused)) size_t _buf_sz) {
-  terminal_request.response->write(terminal, &c, 1);
+  /* terminal_request.response->write(terminal, &c, 1); */
 }
 
 // This returns the number of characters that would be printed

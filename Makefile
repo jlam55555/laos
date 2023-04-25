@@ -41,6 +41,9 @@ NASMFLAGS ?= -F dwarf
 # User controllable linker flags. We set none by default.
 LDFLAGS ?=
 
+# User controllable QEMU flags.
+QEMUFLAGS ?= -no-reboot -no-shutdown
+
 # Internal C flags that should not be changed by the user.
 override CFLAGS +=       \
     -std=c11             \
@@ -96,28 +99,29 @@ $(KERNEL_OUT_DIR)/$(KERNEL): $(OBJ) $(KERNEL_OUT_DIR)
 
 # Alias for building the kernel.
 kernel: $(KERNEL_OUT_DIR)/$(KERNEL)
+	@ # Prevent the default cc rule from being run.
 
 # Adding debug flags to the kernel.
-kernel_debug: CFLAGS += -DDEBUG -g -save-temps
+kernel_debug: CFLAGS += -DDEBUG -g -save-temps=obj
 kernel_debug: NASMFLAGS += -DDEBUG -g
 kernel_debug: kernel
 
 # Include header dependencies.
 -include $(HEADER_DEPS)
 
-$(KERNEL_OUT_DIR):
-	mkdir -p $(KERNEL_OUT_DIR)
-
 # Compilation rules for *.c files.
-$(KERNEL_OUT_DIR)/%.o: $(KERNEL_SRC_DIR)/%.c $(KERNEL_OUT_DIR)
+$(KERNEL_OUT_DIR)/%.o: $(KERNEL_SRC_DIR)/%.c
+	mkdir -p $(shell dirname "$@")
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 # Compilation rules for *.S files.
-$(KERNEL_OUT_DIR)/%.o: $(KERNEL_OUT_DIR) $(KERNEL_SRC_DIR)/%.S
+$(KERNEL_OUT_DIR)/%.o: $(KERNEL_SRC_DIR)/%.S
+	mkdir -p $(shell dirname "$@")
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 # Compilation rules for *.asm (nasm) files.
-$(KERNEL_OUT_DIR)/%.o: $(KERNEL_OUT_DIR) $(KERNEL_SRC_DIR)/%.asm
+$(KERNEL_OUT_DIR)/%.o: $(KERNEL_SRC_DIR)/%.asm
+	mkdir -p $(shell dirname "$@")
 	nasm $(NASMFLAGS) $< -o $@
 
 .PHONY: limine
@@ -182,11 +186,11 @@ $(OUT_DIR)/$(IMAGE_ISO): $(KERNEL_OUT_DIR)/$(KERNEL) limine
 
 .PHONY:
 run_hdd: $(OUT_DIR)/$(IMAGE_HDD)
-	qemu-system-x86_64 $<
+	qemu-system-x86_64 $(QEMUFLAGS) $<
 
 .PHONY:
 run_iso: $(OUT_DIR)/$(IMAGE_ISO)
-	qemu-system-x86_64 $<
+	qemu-system-x86_64 $(QEMUFLAGS) $<
 
 # Remove object files and the final executable.
 .PHONY: clean
