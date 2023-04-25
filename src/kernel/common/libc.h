@@ -1,3 +1,9 @@
+/**
+ * Small subset of the C stdlib.
+ *
+ * For now, implementations are provided on an
+ * as-needs basis.
+ */
 #ifndef COMMON_LIBC_H
 #define COMMON_LIBC_H
 
