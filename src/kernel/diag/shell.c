@@ -39,9 +39,17 @@ void _shell_enqueue_byte(char c) {
  *    have null characters within, which may force us not to use printf.
  */
 void _shell_handle_input() {
+  // Null-terminate string.
   _shell_input_buf[_shell_input_size] = 0;
-  printf("\rGot some input of length %d: \"%s\"\r\n", _shell_input_size,
-         _shell_input_buf);
+
+  // TODO(jlam55555): Implement some simple commands here.
+  if (!strncmp(_shell_input_buf, "help", SHELL_INPUT_BUF_SZ)) {
+    printf("\rHelp menu:\r\n");
+  } else {
+    printf("\rUnknown command.\r\n");
+  }
+
+  // Reset terminal input.
   _shell_input_size = 0;
 }
 

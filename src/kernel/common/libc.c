@@ -8,12 +8,26 @@
 
 bool isprint(char c) { return c >= 32; }
 
-size_t strlen(char *s) {
-  char *it = s;
+size_t strlen(const char *s) {
+  const char *it = s;
   while (*it) {
     ++it;
   }
   return it - s;
+}
+int strcmp(const char *s1, const char *s2) {
+  while (*s1 && *s2 && *s1 == *s2) {
+    ++s1;
+    ++s2;
+  }
+  return *s1 - *s2;
+}
+int strncmp(const char *s1, const char *s2, size_t n) {
+  while (*s1 && *s2 && *s1 == *s2 && n--) {
+    ++s1;
+    ++s2;
+  }
+  return *s1 - *s2;
 }
 
 enum format_spec_type {
@@ -68,8 +82,8 @@ struct format_spec {
 // Note: it is UB to have an invalid format specifier, e.g.,
 // % not followed by a valid length/type specifier, or both
 // h and l specified.
-static size_t _parse_format_spec(char *s, struct format_spec *fs) {
-  char *it = s;
+static size_t _parse_format_spec(const char *s, struct format_spec *fs) {
+  const char *it = s;
   if (*it != '%' || !*(it + 1)) {
     fs->type = FS_INVAL;
     return 1;
@@ -238,7 +252,7 @@ static inline void _term_writer(char c, __attribute__((unused)) char *_buf,
 //
 // This is an internal implementation with inspiration from
 // https://github.com/mpaland/printf
-static size_t _vsnprintf(writer_t write, char *buf, size_t n, char *fmt,
+static size_t _vsnprintf(writer_t write, char *buf, size_t n, const char *fmt,
                          va_list va) {
   size_t i, j, k, len, radix;
   int64_t d;
@@ -333,13 +347,13 @@ static size_t _vsnprintf(writer_t write, char *buf, size_t n, char *fmt,
   return j;
 }
 
-size_t vsnprintf(char *s, size_t n, char *fmt, va_list va) {
+size_t vsnprintf(char *s, size_t n, const char *fmt, va_list va) {
   size_t rv;
   rv = _vsnprintf(_buf_writer, s, n, fmt, va);
   return rv;
 }
 
-size_t snprintf(char *s, size_t n, char *fmt, ...) {
+size_t snprintf(char *s, size_t n, const char *fmt, ...) {
   size_t rv;
   va_list va;
   va_start(va, fmt);
@@ -348,11 +362,11 @@ size_t snprintf(char *s, size_t n, char *fmt, ...) {
   return rv;
 }
 
-size_t vsprintf(char *s, char *fmt, va_list va) {
+size_t vsprintf(char *s, const char *fmt, va_list va) {
   return vsnprintf(s, (size_t)-1, fmt, va);
 }
 
-size_t sprintf(char *s, char *fmt, ...) {
+size_t sprintf(char *s, const char *fmt, ...) {
   size_t rv;
   va_list va;
   va_start(va, fmt);
@@ -361,14 +375,14 @@ size_t sprintf(char *s, char *fmt, ...) {
   return rv;
 }
 
-size_t vprintf(char *fmt, va_list va) {
+size_t vprintf(const char *fmt, va_list va) {
   char *buf = NULL;
   size_t rv;
   rv = _vsnprintf(_term_writer, buf, (size_t)-1, fmt, va);
   return rv;
 }
 
-size_t printf(char *fmt, ...) {
+size_t printf(const char *fmt, ...) {
   size_t rv;
   va_list va;
   va_start(va, fmt);

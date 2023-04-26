@@ -15,14 +15,16 @@
 bool isprint(char c);
 
 // string.h
-size_t strlen(char *);
+size_t strlen(const char *);
+int strcmp(const char *, const char *);
+int strncmp(const char *, const char *, size_t);
 
 // stdio.h
-size_t printf(char *fmt, ...);
-size_t sprintf(char *s, char *fmt, ...);
-size_t snprintf(char *s, size_t n, char *fmt, ...);
-size_t vprintf(char *fmt, va_list);
-size_t vsprintf(char *s, char *fmt, va_list);
-size_t vsnprintf(char *s, size_t n, char *fmt, va_list);
+size_t printf(const char *fmt, ...);
+size_t sprintf(char *s, const char *fmt, ...);
+size_t snprintf(char *s, size_t n, const char *fmt, ...);
+size_t vprintf(const char *fmt, va_list);
+size_t vsprintf(char *s, const char *fmt, va_list);
+size_t vsnprintf(char *s, size_t n, const char *fmt, va_list);
 
 #endif // COMMON_LIBC_H
