@@ -1,6 +1,7 @@
 #include "diag/shell.h"
 
 #include "common/libc.h"
+#include "diag/mm.h"
 #include "drivers/console.h"
 #include "drivers/term.h"
 
@@ -31,6 +32,16 @@ void _shell_enqueue_byte(char c) {
   }
 }
 
+void _shell_dispatch(const char *cmd) {
+  if (!strncmp(cmd, "help", SHELL_INPUT_BUF_SZ)) {
+    printf("\rHelp menu:\r\n");
+  } else if (!strncmp(cmd, "mm", SHELL_INPUT_BUF_SZ)) {
+    print_mm();
+  } else {
+    printf("\rUnknown command.\r\n");
+  }
+}
+
 /**
  * Respond to the input.
  *
@@ -38,16 +49,12 @@ void _shell_enqueue_byte(char c) {
  *    characters due to their special treatment at the moment. Also, it may
  *    have null characters within, which may force us not to use printf.
  */
-void _shell_handle_input() {
+void _shell_handle_input(void) {
   // Null-terminate string.
   _shell_input_buf[_shell_input_size] = 0;
 
   // TODO(jlam55555): Implement some simple commands here.
-  if (!strncmp(_shell_input_buf, "help", SHELL_INPUT_BUF_SZ)) {
-    printf("\rHelp menu:\r\n");
-  } else {
-    printf("\rUnknown command.\r\n");
-  }
+  _shell_dispatch(_shell_input_buf);
 
   // Reset terminal input.
   _shell_input_size = 0;
@@ -62,6 +69,10 @@ void shell_init() {
 void shell_on_interrupt() {
   static char buf[TERM_BUF_SIZE];
   size_t bytes;
+
+  // TODO(jlam55555): Need to make this a loop in case an interrupt
+  //     arrives in the middle of processing an event.
+  // TODO(jlam55555): Need to make the ringbuffer interrupt-safe.
   if (!(bytes = _term_driver->slave_read(_term_driver->dev, buf,
                                          SHELL_INPUT_BUF_SZ))) {
     return;
