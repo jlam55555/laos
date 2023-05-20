@@ -10,11 +10,10 @@
 extern char SAMPLE_STACK[4096];
 
 /**
- * Trampoline to a new stack.
- *
- * Note: naked function because we want to disable the
- * normal function epilogue.
+ * Trampoline to a new stack. This necessarily is
+ * implemented in assembly because we want to modify
+ * the function prologue/epilogue.
  */
-__attribute__((naked)) int trampoline_stack(void *new_stk, int (*)(void));
+int trampoline_stack(void *new_stk, int (*)(void));
 
 #endif // COMMON_PROCESS_H

@@ -39,7 +39,6 @@ trampoline_stack:
  * Used to store the old stack pointer.
  */
 	.bss
-	.globl	_saved_rsp
 	.align 8
 	.type	_saved_rsp, @object
 	.size	_saved_rsp, 8
