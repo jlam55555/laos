@@ -15,6 +15,6 @@ extern char SAMPLE_STACK[4096];
  * Note: naked function because we want to disable the
  * normal function epilogue.
  */
-__attribute__((naked)) int trampoline_stack(void *new_stk, void (*)(void));
+__attribute__((naked)) int trampoline_stack(void *new_stk, int (*)(void));
 
 #endif // COMMON_PROCESS_H

@@ -53,7 +53,7 @@ __attribute__((naked)) int _trampoline_stack_ret(void) {
  * See notes about the extended assembly in _trampoline_stack_ret(), many
  * of the considerations are still true here.
  */
-__attribute__((naked)) int trampoline_stack(void *new_stk, void (*fn)(void)) {
+__attribute__((naked)) int trampoline_stack(void *new_stk, int (*fn)(void)) {
   __asm__("mov %%rbx, %0\n\t"
           "mov %%rsp, %1\n\t"
           "mov %%rbp, %2\n\t"
