@@ -4,16 +4,7 @@
 
 char SAMPLE_STACK[4096];
 
-struct _saved_state {
-  uint64_t rbx;
-  uint64_t rsp;
-  uint64_t rbp;
-  uint64_t r12;
-  uint64_t r13;
-  uint64_t r14;
-  uint64_t r15;
-};
-struct _saved_state _saved_state;
+void *_saved_rsp;
 
 /**
  * Return from stack trampoline.
@@ -31,19 +22,16 @@ struct _saved_state _saved_state;
  * has the intended effect.
  */
 __attribute__((naked)) int _trampoline_stack_ret(void) {
-  __asm__ volatile("mov %0, %%rbx\n\t"
-                   "mov %1, %%rsp\n\t"
-                   "mov %2, %%rbp\n\t"
-                   "mov %3, %%r12\n\t"
-                   "mov %4, %%r13\n\t"
-                   "mov %5, %%r14\n\t"
-                   "mov %6, %%r15\n\t"
+  __asm__ volatile("mov %0, %%rsp\n\t"
+                   "pop %%r15\n\t"
+                   "pop %%r14\n\t"
+                   "pop %%r13\n\t"
+                   "pop %%r12\n\t"
+                   "pop %%rbp\n\t"
+                   "pop %%rbx\n\t"
                    "ret"
                    :
-                   : "m"(_saved_state.rbx), "m"(_saved_state.rsp),
-                     "m"(_saved_state.rbp), "m"(_saved_state.r12),
-                     "m"(_saved_state.r13), "m"(_saved_state.r14),
-                     "m"(_saved_state.r15)
+                   : "m"(_saved_rsp)
                    : "rbx", "rsp", "rbp", "r12", "r13", "r14", "r15", "rax");
 }
 
@@ -54,21 +42,18 @@ __attribute__((naked)) int _trampoline_stack_ret(void) {
  * of the considerations are still true here.
  */
 __attribute__((naked)) int trampoline_stack(void *new_stk, int (*fn)(void)) {
-  __asm__("mov %%rbx, %0\n\t"
-          "mov %%rsp, %1\n\t"
-          "mov %%rbp, %2\n\t"
-          "mov %%r12, %3\n\t"
-          "mov %%r13, %4\n\t"
-          "mov %%r14, %5\n\t"
-          "mov %%r15, %6\n\t"
-          "mov %7, %%rsp\n\t"
-          "mov %7, %%rbp\n\t"
-          "push %8\n\t"
-          "jmp %9"
-          : "=m"(_saved_state.rbx), "=m"(_saved_state.rsp),
-            "=m"(_saved_state.rbp), "=m"(_saved_state.r12),
-            "=m"(_saved_state.r13), "=m"(_saved_state.r14),
-            "=m"(_saved_state.r15)
+  __asm__("push %%rbx\n\t"
+          "push %%rbp\n\t"
+          "push %%r12\n\t"
+          "push %%r13\n\t"
+          "push %%r14\n\t"
+          "push %%r15\n\t"
+          "mov %%rsp, %0\n\t"
+          "mov %1, %%rsp\n\t"
+          "mov %1, %%rbp\n\t"
+          "push %2\n\t"
+          "jmp %3"
+          : "=m"(_saved_rsp)
           : "r"(new_stk), "e"(&_trampoline_stack_ret), "r"(fn)
           : "rbx", "rsp", "rbp", "r12", "r13", "r14", "r15");
 }
