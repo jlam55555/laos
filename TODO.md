@@ -9,6 +9,7 @@ This list will probably begin as a very generic list and become more and more fo
 - [ ] Custom bootloader
 - [ ] Testing framework
 - [ ] Automatic documentation ([Doxygen](https://www.doxygen.nl/)?)
+- [ ] Switch to clang for better tooling (e.g., already using clang-format, can also use clang-tidy, etc.)
 
 # Terminal
 - [ ] (Pseudo)terminal devices (like `/dev/ttyX`, `/dev/ptX`): manage single-channel serial I/O with a file-like interface

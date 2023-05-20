@@ -1,6 +1,7 @@
 #include "diag/shell.h"
 
 #include "common/libc.h"
+#include "common/process.h"
 #include "diag/mm.h"
 #include "drivers/console.h"
 #include "drivers/term.h"
@@ -32,11 +33,15 @@ void _shell_enqueue_byte(char c) {
   }
 }
 
+void _sample_fn(void) { printf("\r\nSample function!\r\n"); }
+
 void _shell_dispatch(const char *cmd) {
   if (!strncmp(cmd, "help", SHELL_INPUT_BUF_SZ)) {
     printf("\rHelp menu:\r\n");
   } else if (!strncmp(cmd, "mm", SHELL_INPUT_BUF_SZ)) {
     print_mm();
+  } else if (!strncmp(cmd, "process", SHELL_INPUT_BUF_SZ)) {
+    trampoline_stack(SAMPLE_STACK + sizeof SAMPLE_STACK, _sample_fn);
   } else {
     printf("\rUnknown command.\r\n");
   }

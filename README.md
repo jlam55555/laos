@@ -4,6 +4,8 @@ A personal study on operating systems, with help from the OSDev Wiki. A long-ter
 
 ### Quick start
 
+##### Build instructions
+
 Make sure to have [QEMU][qemu] and [GNU `make`][make] installed.
 
 ```bash
@@ -18,6 +20,24 @@ sudo make run_hdd
 
 # Cleanup
 sudo make limine-clean clean
+```
+
+##### Debugging
+
+See the [OSDev entry on kernel debugging](https://wiki.osdev.org/Kernel_Debugging#Use_GDB_with_QEMU).
+```bash
+# Make sure to purge old builds.
+sudo make clean
+
+# Build with debugging symbols.
+sudo make kernel_debug out/image.hdd
+
+# Run with debugging.
+sudo qemu-system-x86_64 -s -S out/image.hdd
+
+# Connect GDB.
+# (Perhaps run this in a separate window.)
+gdb -ex "target remote localhost:1234" -ex "file out/kernel/myos.elf"
 ```
 
 ### Features
