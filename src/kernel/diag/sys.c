@@ -68,7 +68,7 @@ void print_gdtr_info(void) {
   size_t base, limit;
 
   read_gdt(&gdtr);
-  printf("gdtr {\n\t.sz=0x%hx\n\t.off=0x%lx\n}\n", gdtr.sz, gdtr.off);
+  printf("gdtr {\r\n\t.sz=0x%hx\r\n\t.off=0x%lx\r\n}\r\n", gdtr.sz, gdtr.off);
 
   // Read segment descriptors.
   num_entries = ((size_t)gdtr.sz + 1) / sizeof(*seg_desc);
@@ -82,21 +82,22 @@ void print_gdtr_info(void) {
     // Compute base.
     base = (size_t)seg_desc->base_3 << 24 | (size_t)seg_desc->base_2 << 16 |
            seg_desc->base_1;
-    printf("segment {\n"
-           "\t.limit=0x%lx\n"
-           "\t.base=0x%lx\n"
-           "\t.read_write=%d\n"
-           "\t.accessed=%d\n"
-           "\t.direction_conforming=%d\n"
-           "\t.executable=%d\n"
-           "\t.is_system=%d\n"
-           "\t.cpu_privilege=%d\n"
-           "\t.is_long_mode_code=%d\n"
-           "\t.is_32bit_protected_mode=%d\n"
-           "}\n",
-           limit, base, seg_desc->access_rw, seg_desc->access_a,
-           seg_desc->access_dc, seg_desc->access_e, seg_desc->access_s,
-           seg_desc->access_dpl, seg_desc->flags_l, seg_desc->flags_db);
+    printf("segment %d {\r\n"
+           "\t.limit=0x%lx\r\n"
+           "\t.base=0x%lx\r\n"
+           "\t.read_write=%d\r\n"
+           "\t.accessed=%d\r\n"
+           "\t.direction_conforming=%d\r\n"
+           "\t.executable=%d\r\n"
+           "\t.is_system=%d\r\n"
+           "\t.cpu_privilege=%d\r\n"
+           "\t.is_long_mode_code=%d\r\n"
+           "\t.is_32bit_protected_mode=%d\r\n"
+           "}\r\n",
+           seg_desc - (struct segment_desc *)gdtr.off, limit, base,
+           seg_desc->access_rw, seg_desc->access_a, seg_desc->access_dc,
+           seg_desc->access_e, seg_desc->access_s, seg_desc->access_dpl,
+           seg_desc->flags_l, seg_desc->flags_db);
   }
 }
 

@@ -41,6 +41,8 @@ int _sample_fn(void) {
 void _shell_dispatch(const char *cmd) {
   if (!strncmp(cmd, "help", SHELL_INPUT_BUF_SZ)) {
     printf("\rHelp menu:\r\n");
+  } else if (!strncmp(cmd, "gdt", SHELL_INPUT_BUF_SZ)) {
+    print_gdtr_info();
   } else if (!strncmp(cmd, "mm", SHELL_INPUT_BUF_SZ)) {
     print_mm();
   } else if (!strncmp(cmd, "process", SHELL_INPUT_BUF_SZ)) {
