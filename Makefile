@@ -43,7 +43,7 @@ NASMFLAGS ?= -F dwarf
 LDFLAGS ?=
 
 # User controllable QEMU flags.
-QEMUFLAGS ?= -no-reboot -no-shutdown
+QEMUFLAGS ?= -no-reboot -no-shutdown -m 4G
 
 # Internal C flags that should not be changed by the user.
 override CFLAGS +=       \
