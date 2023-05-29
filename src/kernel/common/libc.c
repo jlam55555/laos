@@ -6,6 +6,18 @@
 
 #include "drivers/term.h"
 
+// Required for assert.h.
+void __assert_fail(const char *assertion, const char *file, unsigned int line,
+                   const char *function) {
+  printf("assertion failure in %s:%u:%s(): %s\r\n", file, line, function,
+         assertion);
+
+  // Similar to _done() in kernel.c.
+  for (;;) {
+    __asm__("hlt");
+  }
+}
+
 bool isprint(char c) { return c >= 32; }
 
 size_t strlen(const char *s) {

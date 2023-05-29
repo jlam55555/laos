@@ -8,6 +8,7 @@
 #include "common/util.h"
 #include "diag/shell.h"
 #include "drivers/kbd.h"
+#include "mem/phys.h"
 
 static volatile struct limine_memmap_request _limine_memmap_request = {
     .id = LIMINE_MEMMAP_REQUEST,
@@ -85,6 +86,9 @@ void _start(void) {
     printf("base: %lx, len: %lx, type: %s\r\n", mmap_entry->base,
            mmap_entry->length, type_str);
   }
+
+  phys_mem_init(*limine_memmap_response->entries,
+                limine_memmap_response->entry_count);
 
   // Initialize keyboard driver. Note that we want to do this
   // before enabling interrupts, due to the nature of the
