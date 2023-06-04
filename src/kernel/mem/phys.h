@@ -12,17 +12,26 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define PG_SZ 4096
-#define PG_SZ_BITS 12
+#define PG_SZ 4096lu
+#define PG_SZ_BITS 12u
 
 // Round up sz to the nearest page value.
-#define PG_CEIL(sz) ((sz + PG_SZ - 1) & (PG_SZ - 1))
+#define PG_CEIL(sz) (void *)(((size_t)(sz) + PG_SZ - 1) & ~(PG_SZ - 1))
+#define PG_FLOOR(sz) (void *)((size_t)(sz) & ~(PG_SZ - 1))
 
 // Number of pages needed to contain sz.
-#define PG_COUNT(sz) ((sz + PG_SZ - 1) >> PG_SZ_BITS)
+// (Equivalent to (PG_CEIL(sz) >> PG_SZ_BITS)).
+#define PG_COUNT(sz) (((size_t)(sz) + PG_SZ - 1) >> PG_SZ_BITS)
 
 // Check if sz is page-aligned.
-#define PG_ALIGNED(sz) (!(sz & (PG_SZ - 1)))
+#define PG_ALIGNED(sz) (!((size_t)(sz) & (PG_SZ - 1)))
+
+// Bitmap functions.
+#define _BM_BYTE(bm, bit) ((bm)[(bit) >> 3])
+#define _BM_BIT(bit) (1u << ((bit)&0x7))
+#define BM_TEST(bm, bit) (_BM_BYTE(bm, bit) & _BM_BIT(bit))
+#define BM_SET(bm, bit) (_BM_BYTE(bm, bit) |= _BM_BIT(bit))
+#define BM_CLEAR(bm, bit) (_BM_BYTE(bm, bit) &= ~_BM_BIT(bit))
 
 /**
  * Initialize physical memory map using Limine memmap
