@@ -4,6 +4,7 @@
 #include "diag/mm.h"
 #include "drivers/console.h"
 #include "drivers/term.h"
+#include "mem/phys.h"
 
 #define SHELL_INPUT_BUF_SZ 4095
 
@@ -37,6 +38,10 @@ void _shell_dispatch(const char *cmd) {
     printf("\rHelp menu:\r\n");
   } else if (!strncmp(cmd, "mm", SHELL_INPUT_BUF_SZ)) {
     print_mm();
+  } else if (!strncmp(cmd, "phys", SHELL_INPUT_BUF_SZ)) {
+    phys_mem_print_stats();
+  } else if (!strncmp(cmd, "pa", SHELL_INPUT_BUF_SZ)) {
+    printf("\rret=%lx\r\n", phys_page_alloc());
   } else {
     printf("\rUnknown command.\r\n");
   }

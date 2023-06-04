@@ -5,20 +5,26 @@
 
 #include <assert.h>
 
-/**
- * Memory bitmap. Will be initialized in phys_mem_init().
- * This will also need to be mapped into virtual memory
- * by phys_mem_init().
- *
- * TODO(jlam55555): figure out the gymnastics there.
- */
-static char *_mem_bitmap;
+static struct _phys_rr_allocator {
+  /**
+   * Memory bitmap. Will be a HM address, since the new pt
+   * won't include a LM identity map.
+   */
+  char *mem_bitmap;
 
-/**
- * Physical memory statistics.
- */
-static size_t _total_pg;
-static size_t _allocated_pg;
+  /**
+   * Physical memory statistics. total_sz == total_pg * PG_SZ,
+   * included for convenience.
+   */
+  size_t total_sz;
+  size_t total_pg;
+  size_t allocated_pg;
+
+  /**
+   * Round-robin scheduling.
+   */
+  size_t needle;
+} _phys_allocator;
 
 /**
  * Helper function for allocating a physical page.
@@ -28,12 +34,12 @@ static size_t _allocated_pg;
 static bool _phys_page_alloc(void *addr) {
   assert(PG_ALIGNED(addr));
   size_t pg = (size_t)addr >> PG_SZ_BITS;
-  if (BM_TEST(_mem_bitmap, pg)) {
+  if (BM_TEST(_phys_allocator.mem_bitmap, pg)) {
     // Already allocated.
     return false;
   }
-  BM_SET(_mem_bitmap, pg);
-  ++_allocated_pg;
+  BM_SET(_phys_allocator.mem_bitmap, pg);
+  ++_phys_allocator.allocated_pg;
   return true;
 }
 
@@ -48,12 +54,12 @@ static bool _phys_page_alloc(void *addr) {
 static bool _phys_page_free(void *addr) {
   assert(PG_ALIGNED(addr));
   size_t pg = (size_t)addr >> PG_SZ_BITS;
-  if (!BM_TEST(_mem_bitmap, pg)) {
+  if (!BM_TEST(_phys_allocator.mem_bitmap, pg)) {
     // Not allocated.
     return false;
   }
-  BM_CLEAR(_mem_bitmap, pg);
-  --_allocated_pg;
+  BM_CLEAR(_phys_allocator.mem_bitmap, pg);
+  --_phys_allocator.allocated_pg;
   return true;
 }
 
@@ -71,7 +77,8 @@ static void _phys_region_alloc(void *addr, size_t pg_count) {
 }
 
 /**
- * Helper function to initialize the mem_bitmap.
+ * Helper function to initialize the round robin allocator,
+ * such as zeroing the bitmap.
  *
  * Note that we actually set mem_bitmap to the high-mem-mapped
  * version of addr, because we will not provide the low-mem
@@ -81,13 +88,21 @@ static void _phys_region_alloc(void *addr, size_t pg_count) {
  * VM_HM_START is the same as Limine's VM addr start of HHDM.
  * They should be the same value for x86_64, but this is not
  * guaranteed by the Limine spec.
+ *
+ * TODO(jlam55555): This should really take an allocator as argument,
+ * but since we only expect to have a single instance of a physical
+ * allocator this is fine for now. We may want to make this change
+ * when doing performance testing between multiple physical memory
+ * allocators.
  */
-static void _setup_page_bm(void *addr, size_t sz) {
-  _total_pg = sz << 3;
-  _allocated_pg = 0;
+static void _phys_rr_allocator_init(void *addr, size_t sz) {
+  _phys_allocator.total_sz = sz * PG_SZ;
+  _phys_allocator.total_pg = sz;
+  _phys_allocator.allocated_pg = 0;
+  _phys_allocator.needle = 0;
 
   // Use HM version of address.
-  _mem_bitmap = (void *)(VM_HM_START | (size_t)addr);
+  _phys_allocator.mem_bitmap = (void *)(VM_HM_START | (size_t)addr);
 
   // Initialize bitmap.
   memset(addr, 0, sz);
@@ -95,6 +110,10 @@ static void _setup_page_bm(void *addr, size_t sz) {
   // Mark bitmap pages as allocated. We use the physical
   // address here rather than the HHDM address.
   _phys_region_alloc(addr, PG_COUNT(sz));
+
+  // Shim for now, because the first page shouldn't be usable.
+  // TODO(jlam55555): Remove this once we take memory holes into account.
+  assert(_phys_page_alloc(NULL));
 }
 
 void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
@@ -139,8 +158,8 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // protocol, it would be better if we could check this programmatically.
   assert((size_t)mem_bitmap_paddr + bm_sz <= (size_t)4 * 1024 * 1024 * 1024);
 
-  // Initialize the bitmap.
-  _setup_page_bm(mem_bitmap_paddr, bm_sz);
+  // Initialize the round robin allocator.
+  _phys_rr_allocator_init(mem_bitmap_paddr, bm_sz);
 
   // Mark other pages from init_mmap as allocated.
   // TODO(jlam55555): Need to correctly handle overlapping (unusable) regions
@@ -163,10 +182,37 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   phys_mem_print_stats();
 }
 
-void *phys_page_alloc(void) {}
-bool phys_page_free(void *pg) { return false; }
+// Round-robin page allocator.
+void *phys_page_alloc(void) {
+  if (_phys_allocator.allocated_pg == _phys_allocator.total_pg) {
+    // OOM
+    return NULL;
+  }
+
+  size_t start_needle = _phys_allocator.needle;
+  while (BM_TEST(_phys_allocator.mem_bitmap, _phys_allocator.needle)) {
+    if (++_phys_allocator.needle >= _phys_allocator.total_sz) {
+      _phys_allocator.needle -= _phys_allocator.total_sz;
+    }
+
+    // Sanity check. If this assertion fails, that means we're OOM,
+    // but the original OOM check didn't catch this.
+    assert(_phys_allocator.needle != start_needle);
+  }
+
+  // We could move the needle here so that it points to the next
+  // page, or leave it pointing at the last allocated page.
+  // The latter option may be useful if pages are used in a LIFO manner.
+  void *phys_addr = _phys_allocator.needle * PG_SZ;
+  assert(_phys_page_alloc(phys_addr));
+  return phys_addr;
+}
+
+bool phys_page_free(void *pg) { return _phys_page_free(pg); }
+
 void phys_mem_print_stats(void) {
-  printf("Physical page usage %u%%: %lu/%lu pages (%lu/%lu bytes)\r\n",
-         (_allocated_pg * 100 / _total_pg) / 100, _allocated_pg, _total_pg,
-         _allocated_pg * PG_SZ, _total_pg * PG_SZ);
+  printf("\rPhysical page usage %u%%: %lu/%lu pages (%lu/%lu bytes)\r\n",
+         _phys_allocator.allocated_pg * 100 / _phys_allocator.total_pg,
+         _phys_allocator.allocated_pg, _phys_allocator.total_pg,
+         _phys_allocator.allocated_pg * PG_SZ, _phys_allocator.total_sz);
 }

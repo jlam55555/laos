@@ -3,7 +3,8 @@
  * make this into a buddy allocator in the future.
  *
  * Most of these functions, except for phys_mem_print_stats(),
- * should only be called by the virtual memory manager.
+ * should only be called by the virtual memory manager so that they
+ * are properly mapped into VM.
  *
  * N.B. Written as-is with the Limine bootloader, this is limited
  * to ~64TiB of RAM. See memory/virt.h for the reason why.
@@ -44,7 +45,7 @@
 void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count);
 
 /**
- * Allocate a single physical page.
+ * Allocate a single physical page using a round-robin allocator.
  *
  * Returns the physical address of the new page, or NULL
  * if physical pages are exhausted.
