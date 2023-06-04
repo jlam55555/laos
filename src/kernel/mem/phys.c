@@ -1,5 +1,6 @@
 #include "mem/phys.h"
 
+#include "arch/x86_64/pt.h"
 #include "common/libc.h"
 
 #include <assert.h>
@@ -18,15 +19,6 @@ static char *_mem_bitmap;
  */
 static size_t _total_pg;
 static size_t _allocated_pg;
-
-/**
- * Helper function to initialize the mem_bitmap.
- */
-static void _setup_page_bm(void *addr, size_t sz) {
-  _total_pg = sz << 3;
-  _allocated_pg = 0;
-  memset(_mem_bitmap = addr, 0, sz);
-}
 
 /**
  * Helper function for allocating a physical page.
@@ -78,6 +70,33 @@ static void _phys_region_alloc(void *addr, size_t pg_count) {
   }
 }
 
+/**
+ * Helper function to initialize the mem_bitmap.
+ *
+ * Note that we actually set mem_bitmap to the high-mem-mapped
+ * version of addr, because we will not provide the low-mem
+ * identity mapping in the new pagetable. (See mem/virt.h).
+ *
+ * TODO(jlam55555): We are making the subtle assumption here that
+ * VM_HM_START is the same as Limine's VM addr start of HHDM.
+ * They should be the same value for x86_64, but this is not
+ * guaranteed by the Limine spec.
+ */
+static void _setup_page_bm(void *addr, size_t sz) {
+  _total_pg = sz << 3;
+  _allocated_pg = 0;
+
+  // Use HM version of address.
+  _mem_bitmap = (void *)(VM_HM_START | (size_t)addr);
+
+  // Initialize bitmap.
+  memset(addr, 0, sz);
+
+  // Mark bitmap pages as allocated. We use the physical
+  // address here rather than the HHDM address.
+  _phys_region_alloc(addr, PG_COUNT(sz));
+}
+
 void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // TODO(jlam55555): Detect memory limit from init mmap.
   // TODO(jlam55555): Determine what to do with memory holes.
@@ -123,9 +142,6 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // Initialize the bitmap.
   _setup_page_bm(mem_bitmap_paddr, bm_sz);
 
-  // Mark bitmap pages as allocated.
-  _phys_region_alloc(mem_bitmap_paddr, PG_COUNT(bm_sz));
-
   // Mark other pages from init_mmap as allocated.
   // TODO(jlam55555): Need to correctly handle overlapping (unusable) regions
   // and memory holes. Overlapping unusable regions are allowed by the Limine
@@ -146,6 +162,7 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // TODO(jlam55555): Remove this.
   phys_mem_print_stats();
 }
+
 void *phys_page_alloc(void) {}
 bool phys_page_free(void *pg) { return false; }
 void phys_mem_print_stats(void) {

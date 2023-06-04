@@ -4,6 +4,9 @@
  *
  * Most of these functions, except for phys_mem_print_stats(),
  * should only be called by the virtual memory manager.
+ *
+ * N.B. Written as-is with the Limine bootloader, this is limited
+ * to ~64TiB of RAM. See memory/virt.h for the reason why.
  */
 #ifndef MEM_PHYS_H
 #define MEM_PHYS_H
@@ -27,6 +30,7 @@
 #define PG_ALIGNED(sz) (!((size_t)(sz) & (PG_SZ - 1)))
 
 // Bitmap functions.
+// TODO(jlam55555): Move these into some util library.
 #define _BM_BYTE(bm, bit) ((bm)[(bit) >> 3])
 #define _BM_BIT(bit) (1u << ((bit)&0x7))
 #define BM_TEST(bm, bit) (_BM_BYTE(bm, bit) & _BM_BIT(bit))

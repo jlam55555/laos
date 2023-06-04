@@ -30,6 +30,10 @@
 // virtual address.
 #define VM_CANON_BITS (~(VM_MAX_BIT - 1))
 
+// Start of high memory. (E.g., this is the beginning
+// of the HHDM virtual address space.)
+#define VM_HM_START (VM_CANON_BITS | VM_MAX_BIT)
+
 // Number of paging levels. Assume 4-level paging
 // for now.
 #define VM_PG_LV 4
