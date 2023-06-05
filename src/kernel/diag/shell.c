@@ -41,6 +41,7 @@ void _shell_dispatch(const char *cmd) {
   } else if (!strncmp(cmd, "phys", SHELL_INPUT_BUF_SZ)) {
     phys_mem_print_stats();
   } else if (!strncmp(cmd, "pa", SHELL_INPUT_BUF_SZ)) {
+    // Allocate a random page. For testing purposes.
     printf("\rret=%lx\r\n", phys_page_alloc());
   } else {
     printf("\rUnknown command.\r\n");

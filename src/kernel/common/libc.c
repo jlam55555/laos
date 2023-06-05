@@ -63,8 +63,7 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 // Required for assert.h.
 void __assert_fail(const char *assertion, const char *file, unsigned int line,
                    const char *function) {
-  printf("assertion failure in %s:%u:%s(): %s\r\n", file, line, function,
-         assertion);
+  printf("%s:%u:%s(): assert(%s) failed\r\n", file, line, function, assertion);
 
   // Similar to _done() in kernel.c.
   for (;;) {

@@ -47,11 +47,15 @@ void _start(void) {
     printf("Error: limine memmap request failed\r\n");
     _done();
   }
-
-  // Print out information about the current memory map.
   struct limine_memmap_response *limine_memmap_response =
       _limine_memmap_request.response;
-  for (int i = 0; i < limine_memmap_response->entry_count; ++i) {
+
+  virt_mem_init(*limine_memmap_response->entries,
+                limine_memmap_response->entry_count);
+
+  // Print out information about the current memory map.
+  void *prev_end = NULL;
+  for (size_t i = 0; i < limine_memmap_response->entry_count; ++i) {
     struct limine_memmap_entry *mmap_entry =
         (*limine_memmap_response->entries) + i;
     char *type_str;
@@ -83,12 +87,14 @@ void _start(void) {
     default:
       type_str = "UNKNOWN";
     }
+    if (mmap_entry->base != (size_t)prev_end) {
+      printf("gap: %lx, len: %lx\r\n", prev_end,
+             mmap_entry->base - (size_t)prev_end);
+    }
+    prev_end = (void *)(mmap_entry->base + mmap_entry->length);
     printf("base: %lx, len: %lx, type: %s\r\n", mmap_entry->base,
            mmap_entry->length, type_str);
   }
-
-  virt_mem_init(*limine_memmap_response->entries,
-                limine_memmap_response->entry_count);
 
   // TODO(jlam55555): Working here.
   // This function is marked as noreturn for now but it doesn't
