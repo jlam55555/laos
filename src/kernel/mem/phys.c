@@ -5,28 +5,34 @@
 
 #include <assert.h>
 
+// TODO(jlam): Handle hugepage allocation.
+
 /**
  * State variable singleton struct for the physical memory allocator.
  */
 static struct _phys_rr_allocator {
   /**
-   * Memory bitmap. Will be a HM address, since the new pt won't include a LM
-   * identity map.
+   * Store information about each `struct page`.
+   *
+   * Will be a HM address, since the new PT won't include a LM identity map.
+   *
+   * N.B. This was previously a bitmap that only stored whether each physical
+   * page was allocated, but now we want to store more more info per page.
    */
-  char *mem_bitmap;
+  struct page *mem_bitmap;
 
   /**
    * Physical memory statistics. total_sz == total_pg * PG_SZ, included for
    * convenience. Total size is the end of the physical address space.
    *
-   * Note that hole_pg is counted in the total_pg but not the allocated_pg. That
-   * is, total_pg = allocated_pg + hole_pg + <free pg>. This definition may
-   * change in the future if a more convenient definition arises.
+   * Note that unusable_pg is counted in the total_pg but not the allocated_pg.
+   * That is, total_pg = allocated_pg + unusable_pg + <free pg>. This definition
+   * may change in the future if a more convenient definition arises.
    */
   size_t total_sz;
   size_t total_pg;
   size_t allocated_pg;
-  size_t hole_pg;
+  size_t unusable_pg;
 
   /**
    * Round-robin scheduling.
@@ -35,7 +41,8 @@ static struct _phys_rr_allocator {
 } _phys_allocator;
 
 /**
- * Helper function for allocating a physical page.
+ * Helper function for allocating a physical page. Errors if the page is
+ * unusable (e.g., hole memory).
  *
  * Returns true iff the physical page is free.
  */
@@ -43,31 +50,31 @@ static bool _phys_page_alloc(void *addr) {
   assert(PG_ALIGNED(addr));
   size_t pg = (size_t)addr >> PG_SZ_BITS;
   assert(pg < _phys_allocator.total_pg);
-  if (BM_TEST(_phys_allocator.mem_bitmap, pg)) {
+  assert(!_phys_allocator.mem_bitmap[pg].unusable);
+  if (_phys_allocator.mem_bitmap[pg].present) {
     // Already allocated.
     return false;
   }
-  BM_SET(_phys_allocator.mem_bitmap, pg);
+  _phys_allocator.mem_bitmap[pg].present = true;
   ++_phys_allocator.allocated_pg;
   return true;
 }
 
 /**
- * Helper function for freeing a physical page.
+ * Helper function for freeing a physical page. Errors if the page is unusable
+ * (e.g., hole memory).
  *
  * Returns true iff the physical page is allocated.
- *
- * TODO(jlam55555): Alert if the physical page is reserved or lies in a memory
- * hole. We will need a larger bitmap to store this information.
  */
 static bool _phys_page_free(void *addr) {
   assert(PG_ALIGNED(addr));
   size_t pg = (size_t)addr >> PG_SZ_BITS;
-  if (!BM_TEST(_phys_allocator.mem_bitmap, pg)) {
+  assert(!_phys_allocator.mem_bitmap[pg].unusable);
+  if (!_phys_allocator.mem_bitmap[pg].present) {
     // Not allocated.
     return false;
   }
-  BM_CLEAR(_phys_allocator.mem_bitmap, pg);
+  _phys_allocator.mem_bitmap[pg].present = false;
   --_phys_allocator.allocated_pg;
   return true;
 }
@@ -79,14 +86,19 @@ static bool _phys_page_free(void *addr) {
  *
  * If this assumption is false, we error.
  */
-static void _phys_region_alloc(void *addr, size_t pg_count, bool is_hole) {
+static void _phys_region_alloc(void *addr, size_t pg_count, bool is_unusable) {
   for (size_t i = 0; i < pg_count; ++i, addr += PG_SZ) {
-    assert(_phys_page_alloc(addr));
+    if (is_unusable) {
+      size_t pg = (size_t)addr >> PG_SZ_BITS;
+      assert(!_phys_allocator.mem_bitmap[pg].present);
+      _phys_allocator.mem_bitmap[pg].unusable = true;
+    } else {
+      assert(_phys_page_alloc(addr));
+    }
   }
-  // Manually adjust hole page counts.
-  if (is_hole) {
-    _phys_allocator.allocated_pg -= pg_count;
-    _phys_allocator.hole_pg += pg_count;
+  // Adjust unusable page counts.
+  if (is_unusable) {
+    _phys_allocator.unusable_pg += pg_count;
   }
 }
 
@@ -118,32 +130,32 @@ static void _phys_rr_allocator_init(void *addr, size_t mem_limit,
   _phys_allocator.needle = 0;
 
   // Use HM version of address.
-  _phys_allocator.mem_bitmap = (void *)(VM_HM_START | (size_t)addr);
+  _phys_allocator.mem_bitmap = (struct page *)(VM_HM_START | (size_t)addr);
 
-  // Initialize bitmap.
-  size_t bm_sz = _phys_allocator.total_pg >> 3;
+  // Initialize bitmap. bm_sz = "bitmap size"
+  size_t bm_sz = _phys_allocator.total_pg * sizeof(struct page);
   memset(addr, 0, bm_sz);
 
   // Mark bitmap pages as allocated. We use the physical address here rather
   // than the HHDM address.
   _phys_region_alloc(addr, PG_COUNT(bm_sz), false);
 
-  // Mark allocated regions in the bitmap, including holes.
+  // Mark unusable regions in the bitmap.
   void *prev_end = NULL;
   for (size_t mmap_entry_i = 0; mmap_entry_i < entry_count; ++mmap_entry_i) {
     struct limine_memmap_entry *mmap_entry = init_mmap + mmap_entry_i;
 
-    // Memory hole detected. Mark it as a hole page.
+    // Memory hole detected. Mark it as unusable memory.
     if ((size_t)prev_end != mmap_entry->base) {
       _phys_region_alloc(prev_end,
                          PG_COUNT((void *)mmap_entry->base - prev_end), true);
     }
     prev_end = (void *)(mmap_entry->base + mmap_entry->length);
 
-    // Mark non-usable regions as allocated.
+    // Mark unusable memory regions.
     if (mmap_entry->type != LIMINE_MEMMAP_USABLE) {
       _phys_region_alloc((void *)mmap_entry->base, PG_COUNT(mmap_entry->length),
-                         false);
+                         true);
     }
   }
 }
@@ -156,8 +168,8 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   assert(PG_ALIGNED(mem_limit));
 
   // Bitmap size is (dimensional analysis):
-  // mem_limit bytes * page/4096bytes * 1bit/1page * 1byte/8bits.
-  size_t bm_sz = mem_limit >> 15;
+  // mem_limit bytes * page/4096bytes * sizeof(struct page) bytes/page.
+  size_t bm_sz = (mem_limit >> PG_SZ_BITS) * sizeof(struct page);
 
   // Allocate physical memory for bitmap in first usable region
   // large enough for it.
@@ -213,7 +225,8 @@ void *phys_page_alloc(void) {
   }
 
   size_t start_needle = _phys_allocator.needle;
-  while (BM_TEST(_phys_allocator.mem_bitmap, _phys_allocator.needle)) {
+  while (_phys_allocator.mem_bitmap[_phys_allocator.needle].present ||
+         _phys_allocator.mem_bitmap[_phys_allocator.needle].unusable) {
     if (++_phys_allocator.needle >= _phys_allocator.total_sz) {
       _phys_allocator.needle -= _phys_allocator.total_sz;
     }
@@ -226,22 +239,20 @@ void *phys_page_alloc(void) {
   // We could move the needle here so that it points to the next page, or leave
   // it pointing at the last allocated page. The latter option may be useful if
   // pages are used in a LIFO manner.
-  void *phys_addr = (void *)(_phys_allocator.needle * PG_SZ);
+  void *phys_addr = (void *)((size_t)_phys_allocator.needle << PG_SZ_BITS);
   assert(_phys_page_alloc(phys_addr));
   return phys_addr;
 }
 
-/**
- * Free physical page.
- */
 void phys_page_free(void *pg) { assert(_phys_page_free(pg)); }
 
 void phys_mem_print_stats(void) {
   printf("\rPhysical page usage %u%%: %lu/%lu pages (%lu/%lu bytes)\r\n",
          _phys_allocator.allocated_pg * 100 /
-             (_phys_allocator.total_pg - _phys_allocator.hole_pg),
+             (_phys_allocator.total_pg - _phys_allocator.unusable_pg),
          _phys_allocator.allocated_pg,
-         (_phys_allocator.total_pg - _phys_allocator.hole_pg),
+         (_phys_allocator.total_pg - _phys_allocator.unusable_pg),
          _phys_allocator.allocated_pg << PG_SZ_BITS,
-         _phys_allocator.total_sz - (_phys_allocator.hole_pg << PG_SZ_BITS));
+         _phys_allocator.total_sz -
+             (_phys_allocator.unusable_pg << PG_SZ_BITS));
 }

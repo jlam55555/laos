@@ -96,12 +96,6 @@ void _start(void) {
            mmap_entry->length, type_str);
   }
 
-  // TODO(jlam55555): Working here.
-  // This function is marked as noreturn for now but it doesn't
-  // do anything atm.
-  virt_mem_reclaim(*limine_memmap_response->entries,
-                   limine_memmap_response->entry_count, NULL);
-
   // Initialize keyboard driver. Note that we want to do this
   // before enabling interrupts, due to the nature of the
   // keyboard initialization code.

@@ -6,8 +6,12 @@
  * called by the virtual memory manager so that they are properly mapped into
  * VM.
  *
- * N.B. Written as-is with the Limine bootloader, this is limited to ~64TiB of
- * RAM. See memory/virt.h for the reason why.
+ * N.B. Assuming `sizeof(struct page) == 64` like it is in Linux, we will start
+ * running into problems with this allocator and the stock Linux
+ * bootloader/protocol once the size of the `struct page` array exceeds the HHDM
+ * size (4GiB). This will happen once we reach 256GiB of RAM, which is not that
+ * unreasonable of a number today. The VMM will also have problems with large
+ * memory due to the size of the VM space.
  */
 #ifndef MEM_PHYS_H
 #define MEM_PHYS_H
@@ -31,7 +35,8 @@
 #define PG_ALIGNED(sz) (!((size_t)(sz) & (PG_SZ - 1)))
 
 // Bitmap functions.
-// TODO(jlam55555): Move these into some util library.
+// TODO(jlam55555): Move these into some util library. These were used for the
+// page bitmap when it was a bitmap, but now it is not a bitmap.
 #define _BM_BYTE(bm, bit) ((bm)[(bit) >> 3])
 #define _BM_BIT(bit) (1u << ((bit)&0x7))
 #define BM_TEST(bm, bit) (_BM_BYTE(bm, bit) & _BM_BIT(bit))
@@ -45,6 +50,27 @@
 #define GiB (MiB * KiB)
 #define TiB (GiB * KiB)
 #define PiB (TiB * KiB)
+
+/**
+ * Used to track information about each physical memory page. Linux has a struct
+ * of the same name with the same purpose.
+ *
+ * This struct may grow as amount of tracked data needed grows. In Linux,
+ * `sizeof(struct page) == 64`, which means that 64/4096 ~= 1.5% of the total
+ * physical memory goes towards the struct page array.
+ *
+ * `struct page`s will be zero-initialized by the physical memory allocator.
+ */
+struct page {
+  // Set if allocated by the physical memory allocator.
+  bool present : 1;
+
+  // Set if hole memory.
+  bool unusable : 1;
+
+  // For future use. We may expand the size of the `struct page` if necessary.
+  uint8_t : 6;
+} __attribute__((packed));
 
 /**
  * Initialize physical memory map using Limine memmap feature (which is itself

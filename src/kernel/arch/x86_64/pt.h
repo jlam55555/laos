@@ -42,6 +42,13 @@
 #define VM_PG_SZ 4096
 #define VM_PG_SZ_BITS 12
 
+// Size of a hugepage (2MiB).
+#define VM_HGPG_SZ 2097152
+#define VM_HGPG_SZ_BITS 24
+
+// Similar to the PG_ALIGNED macro.
+#define VM_HGPG_ALIGNED(sz) (!((size_t)(sz) & (VM_HGPG_SZ - 1)))
+
 /**
  * Page-map level X table (levels 2-4).
  *

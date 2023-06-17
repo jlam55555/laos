@@ -1,6 +1,7 @@
 /**
- * Virtual memory manager. Creates and maintains the page table data structure,
- * calling into the physical memory allocator to allocate/free physical pages.
+ * Virtual memory manager (VMM). Creates and maintains the page table data
+ * structure, calling into the physical memory allocator to allocate/free
+ * physical pages.
  *
  * This creates a page table with the following memory map. This assumes a
  * x86_64 system with a 48-bit VM addr space. The memory map is very similar to
@@ -23,6 +24,11 @@
  * An identity map is not provided; use of the HHDM is preferred. The identity
  * map is only really useful before the initial page table is set up.
  *
+ * TODO(jlam55555): Update the following comment. We don't need
+ * virt_mem_reclaim() anymore -- we don't need to reclaim anything from the
+ * virtual memory map -- the stack and other functions are simply located in the
+ * HHDM so they don't use any special page table entries.
+ *
  * virt_mem_init() is used to set up the virtual memory manager.
  * virt_mem_reclaim() is used to reclaim bootloader-reclaimable memory, create a
  * new (4KiB) kernel stack, and jump into that new stack. This is necessary
@@ -30,13 +36,10 @@
  * is also large; we follow the Linux convention that kernel stacks are
  * 4KiB/1pg).
  *
- * N.B. We will start running into problems with this allocator once we start
- * reaching around 64TiB of RAM. The virtual memory manager will start running
- * into problems at around 128TiB of RAM, but the physical memory manager will
- * have problems first because it needs to find a contiguous 64TiB>>15 = 4GiB of
- * contiguous usable space in identity-mapped memory, which will not be provided
- * by the Limine spec (unless we manually extend the bootloader pagetable). I
- * think it's safe to say this won't be a problem any time soon.
+ * N.B. The VMM will start reaching problems once we reach 128TiB of RAM due to
+ * the HM restriction, but the PMM will have problems sooner. See phys.h for a
+ * description of this problem. Suffice it to say that we shouldn't worry about
+ * the VMM memory issues anytime soon.
  */
 #ifndef MEM_VIRT_H
 #define MEM_VIRT_H
@@ -66,9 +69,10 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count);
  * This could be folded into virt_mem_init(), but is kept separate to be more
  * flexible.
  */
-/* __attribute__((noreturn)) */ void
-virt_mem_reclaim(struct limine_memmap_entry *init_mmap, size_t entry_count,
-                 void *(cb)(void));
+/* /\* __attribute__((noreturn)) *\/ void */
+/* virt_mem_reclaim(struct limine_memmap_entry *init_mmap, size_t
+   entry_count, */
+/*                  void *(cb)(void)); */
 
 void *virt_mem_map(void *phys_ptr, size_t pg);
 void *virt_mem_map_noalloc(void *phys_ptr, size_t pg);
