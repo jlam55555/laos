@@ -69,7 +69,11 @@ struct page {
   bool unusable : 1;
 
   // For future use. We may expand the size of the `struct page` if necessary.
-  uint8_t : 6;
+  uint64_t : 62;
+
+  // TODO(jlam55555): Remove this, for testing. Make `struct page` 64 bytes like
+  // in Linux.
+  uint64_t test[7];
 } __attribute__((packed));
 
 /**

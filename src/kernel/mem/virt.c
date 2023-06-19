@@ -28,16 +28,37 @@ struct pmlx_entry *_virt_alloc_pmlx_table(void) {
  */
 void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
                     bool is_hugepage) {
+  struct pmlx_entry *pml4e, *pml3, *pml3e, *pml2, *pml2e, *pml1, *pml1e, *pg;
+
   assert(PG_ALIGNED(phys_addr));
   assert(PG_ALIGNED(virt_addr));
+  assert(va_is_canonical(virt_addr));
 
-  // Get PML4 entry (PML3 table). Create if it doesn't exist.
+  // Get PML4 entry (PML3 table). Create if it doesn't exist. Bits [39,48) of
+  // virtual address.
+  // TODO(jlam55555): We can probably simplify this with more logic.
+#define GET_PMLE(pml, pmle, offset)                                            \
+  pmle = &pml[((size_t)virt_addr >> offset) & 0x1ff];
+#define GET_PMLNEXT(pml, pmle, pmlnext, offset)                                \
+  GET_PMLE(pml, pmle, offset);                                                 \
+  if (!pmle->p) {                                                              \
+    /* TODO(jlam55555): Turn this into a function. */                          \
+    pmle->p = true;                                                            \
+    pmle->addr =                                                               \
+        ((size_t)_virt_alloc_pmlx_table() & (PM_MAX_BIT - 1)) >> PG_SZ_BITS;   \
+  }                                                                            \
+  pmlnext = (void *)((pmle->addr << PG_SZ_BITS) | VM_HM_START);
 
-  // Get PML3 entry (PML2 table). Create if it doesn't exist.
+  GET_PMLNEXT(pml4, pml4e, pml3, 39);
+  GET_PMLNEXT(pml3, pml3e, pml2, 30);
+  GET_PMLNEXT(pml2, pml2e, pml1, 21);
+  GET_PMLE(pml1, pml1e, 12);
 
-  // Get PML2 entry (PML1 table). Create if it doesn't exist.
+#undef GET_PMLNEXT
+#undef GET_PMLE
 
-  // Create PML1 entry (page mapping).
+  // TODO(jlam55555): map page.
+  // TODO(jlam55555): create intermediate ones on demand.
 }
 
 /**
@@ -92,7 +113,8 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   phys_mem_init(init_mmap, entry_count);
 
   // Create an entry page table.
-  struct pmlx_entry *pml4 = _virt_alloc_pmlx_table();
+  struct pmlx_entry *pml4 =
+      (void *)((size_t)_virt_alloc_pmlx_table() | VM_HM_START);
 
   // Create a HHDM.
   _virt_create_hhdm(pml4, init_mmap, entry_count);

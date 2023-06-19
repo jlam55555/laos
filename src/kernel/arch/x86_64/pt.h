@@ -20,22 +20,28 @@
 
 #include "arch/x86_64/registers.h" // CR3 register
 
+// Physical address space size (bits).
+#define PM_ADDR_SPACE_SZ 52
+
+// Largest bit in the physical address space.
+#define PM_MAX_BIT (1lu << (PM_ADDR_SPACE_SZ - 1))
+
 // Virtual address space size (bits).
 #define VM_ADDR_SPACE_SZ 48
 
 // Largest bit in the virtual address space.
 #define VM_MAX_BIT (1lu << (VM_ADDR_SPACE_SZ - 1))
 
-// Bits that should all be equal in a canonical
-// virtual address.
+// Bits that should all be equal in a canonical virtual address.
 #define VM_CANON_BITS (~(VM_MAX_BIT - 1))
 
-// Start of high memory. (E.g., this is the beginning
-// of the HHDM virtual address space.)
+// Start of high memory. (E.g., this is the beginning of the HHDM virtual
+// address space.)
 #define VM_HM_START (VM_CANON_BITS | VM_MAX_BIT)
+_Static_assert(VM_CANON_BITS == VM_HM_START,
+               "Canonical bits/high memory computation failure");
 
-// Number of paging levels. Assume 4-level paging
-// for now.
+// Number of paging levels. Assume 4-level paging for now.
 #define VM_PG_LV 4
 
 // Size of an ordinary (non-PSE) page.
@@ -52,12 +58,12 @@
 /**
  * Page-map level X table (levels 2-4).
  *
- * Used for the page directory table (level 2), the page
- * directory pointer table (level 3), and the PML4 (level 4)
- * tables. Not used for the page table (level 1).
+ * Used for the page directory table (level 2), the page directory pointer table
+ * (level 3), and the PML4 (level 4) tables. Not used for the page table (level
+ * 1).
  *
- * The avl* fields are ignored by the architecture, and the
- * reserved fields must not be used (set to zero).
+ * The avl* fields are ignored by the architecture, and the reserved fields must
+ * not be used (set to zero).
  *
  * See IA32/64 Reference, Volume 3A, 4-32
  */
@@ -69,8 +75,8 @@ struct pmlx_entry {
   uint8_t pcd : 1;
   uint8_t a : 1;
   uint8_t avl : 1;
-  // Reserved on PML4, used to indicate 1GiB/2MiB pages
-  // on PML3 and PML2, respectively.
+  // Reserved on PML4, used to indicate 1GiB/2MiB pages on PML3 and PML2,
+  // respectively.
   uint8_t ps : 1;
   uint8_t avl2 : 4;
   // Assuming a 52-bit physical address space.
@@ -91,9 +97,8 @@ static inline void _get_pt_addr(struct cr3_register_pcide *reg_cr3) {
 }
 
 /**
- * Canonicalize virtual address. For a 48-bit address space
- * (4-level paging) in x86_64, this means sign-extending bit 47
- * through to bit 63.
+ * Canonicalize virtual address. For a 48-bit address space (4-level paging) in
+ * x86_64, this means sign-extending bit 47 through to bit 63.
  */
 static inline void *va_canonicalize(void *addr) {
   return (uint64_t)addr & VM_MAX_BIT ? (void *)((uint64_t)addr | VM_CANON_BITS)

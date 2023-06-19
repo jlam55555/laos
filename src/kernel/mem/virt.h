@@ -24,22 +24,20 @@
  * An identity map is not provided; use of the HHDM is preferred. The identity
  * map is only really useful before the initial page table is set up.
  *
- * TODO(jlam55555): Update the following comment. We don't need
- * virt_mem_reclaim() anymore -- we don't need to reclaim anything from the
- * virtual memory map -- the stack and other functions are simply located in the
- * HHDM so they don't use any special page table entries.
+ * virt_mem_init() is sets up the virtual memory manager, creates a new (4KiB)
+ * kernel stack, and jump into that new stack. This is necessary because the old
+ * kernel stack is located in bootloader-reclaimable memory (it is also large;
+ * we follow the Linux convention that kernel stacks are 4KiB/1pg).
  *
- * virt_mem_init() is used to set up the virtual memory manager.
- * virt_mem_reclaim() is used to reclaim bootloader-reclaimable memory, create a
- * new (4KiB) kernel stack, and jump into that new stack. This is necessary
- * because the old kernel stack is located in bootloader-reclaimable memory (it
- * is also large; we follow the Linux convention that kernel stacks are
- * 4KiB/1pg).
- *
- * N.B. The VMM will start reaching problems once we reach 128TiB of RAM due to
- * the HM restriction, but the PMM will have problems sooner. See phys.h for a
- * description of this problem. Suffice it to say that we shouldn't worry about
- * the VMM memory issues anytime soon.
+ * N.B. The VMM will start reaching problems once we reach 128TiB (half of the
+ * virtual address space) of RAM due to the HM restriction, but the PMM will
+ * have problems sooner. See phys.h for a description of this problem. Suffice
+ * it to say that we shouldn't worry about the VMM memory issues anytime soon.
+ * Note that this is also far less than the size of the physical memory address
+ * space (2^52=4PiB). This limit can be increased if we switch to 5-level paging
+ * (which increases the virtual address space to 128PiB). Like Linux, we use a
+ * HHDM and will suffer if the physical address size exceeds the virtual address
+ * space.
  */
 #ifndef MEM_VIRT_H
 #define MEM_VIRT_H
