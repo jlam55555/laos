@@ -45,6 +45,22 @@
 #include <limine.h>
 #include <stddef.h>
 
+/*
+ * Similar to `struct vm_area_struct` in Linux. Represents a contiguous VM
+ * region allocated (mapped) by a process via `mmap()`, but not necessarily all
+ * mapped in the page table. The page fault handler will use this to determine
+ * whether a nonpresent virtual address is valid and should be faulted in from
+ * memory.
+ *
+ * These are maintained as a sorted linked-list of non-overlapping regions on a
+ * `struct process`.
+ */
+struct vm_area {
+  uint64_t base;
+  uint64_t len;
+  struct vm_area *next;
+};
+
 /**
  * Initialize the virtual memory manager. This performs the following steps:
  * 1. Initializes the physical memory manager with the initial mmap entries.
@@ -72,7 +88,15 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count);
    entry_count, */
 /*                  void *(cb)(void)); */
 
-void *virt_mem_map(void *phys_ptr, size_t pg);
-void *virt_mem_map_noalloc(void *phys_ptr, size_t pg);
+/**
+ * mmap-like functionality. Maps the contiguous memory region of `pg` pages
+ * starting at `phys_ptr` to a contiguous virtual memory region, and return the
+ * start of the virtual region.
+ */
+/* void *virt_mem_map(void *phys_ptr, size_t pg); */
+
+/**
+ * TODO(jlam55555): kmalloc and vmalloc interfaces.
+ */
 
 #endif // MEM_VIRT_H

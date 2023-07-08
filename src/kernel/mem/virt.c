@@ -23,15 +23,11 @@ struct pmlx_entry *_virt_alloc_pmlx_table(void) {
  *
  * Assumes the page isn't already mapped since there's no reason we should
  * map a virtual page twice -- this would mean there's an error in our VMM.
- *
- * TODO(jlam55555): Free memory, perhaps using refcounts.
  */
 void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
                     bool is_hugepage) {
-  struct pmlx_entry *pml4e, *pml3, *pml3e, *pml2, *pml2e, *pml1, *pml1e, *pg;
+  struct pmlx_entry *pml4e, *pml3, *pml3e, *pml2, *pml2e, *pml1, *pml1e;
 
-  assert(PG_ALIGNED(phys_addr));
-  assert(PG_ALIGNED(virt_addr));
   assert(va_is_canonical(virt_addr));
 
   // Get PML4 entry (PML3 table). Create if it doesn't exist. Bits [39,48) of
@@ -51,14 +47,24 @@ void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
 
   GET_PMLNEXT(pml4, pml4e, pml3, 39);
   GET_PMLNEXT(pml3, pml3e, pml2, 30);
-  GET_PMLNEXT(pml2, pml2e, pml1, 21);
-  GET_PMLE(pml1, pml1e, 12);
-
+  if (is_hugepage) {
+    assert(VM_HGPG_ALIGNED(phys_addr));
+    assert(VM_HGPG_ALIGNED(virt_addr));
+    GET_PMLE(pml2, pml2e, 21);
+    assert(!pml2e->p);
+    pml2e->p = true;
+    pml2e->addr = ((size_t)phys_addr & (PM_MAX_BIT - 1)) >> PG_SZ_BITS;
+  } else {
+    assert(PG_ALIGNED(phys_addr));
+    assert(PG_ALIGNED(virt_addr));
+    GET_PMLNEXT(pml2, pml2e, pml1, 21);
+    GET_PMLE(pml1, pml1e, 12);
+    assert(!pml1e->p);
+    pml1e->p = true;
+    pml1e->addr = ((size_t)phys_addr & (PM_MAX_BIT - 1)) >> PG_SZ_BITS;
+  }
 #undef GET_PMLNEXT
 #undef GET_PMLE
-
-  // TODO(jlam55555): map page.
-  // TODO(jlam55555): create intermediate ones on demand.
 }
 
 /**
@@ -141,6 +147,8 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
 /*   // reclaimed memory. */
 /* } */
 
-void *virt_mem_map(void *phys_ptr, size_t pg) { return NULL; }
-
-void *virt_mem_map_noalloc(void *phys_ptr, size_t pg) { return NULL; }
+/* void *virt_mem_map(void *phys_ptr, size_t pg) { */
+/*   _virt_map_page(struct pmlx_entry * pml4, void *phys_addr, void *virt_addr,
+ */
+/*                  bool is_hugepage); */
+/* } */

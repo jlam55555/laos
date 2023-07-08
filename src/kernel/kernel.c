@@ -22,20 +22,38 @@ static void _done(void) {
   }
 }
 
-__attribute__((interrupt)) void
+static __attribute__((interrupt)) void
 _timer_irq(__attribute__((unused)) struct interrupt_frame *frame) {
   // Nothing to do for now.
   pic_send_eoi(0);
 }
 
 static struct kbd_driver *_kbd_driver;
-__attribute__((interrupt)) void
+static __attribute__((interrupt)) void
 _kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
   // Pass scancode to keyboard IRQ handler.
   // TODO(jlam55555): Make the IRQ function accept the interrupt frame
   //    rather than the character.
   _kbd_driver->kbd_irq(inb(0x60));
   pic_send_eoi(1);
+}
+
+static __attribute__((interrupt)) void
+_pf_isr(__attribute((unused)) struct interrupt_frame *frame) {
+  printf("page fault\r\n");
+  _done();
+}
+
+static __attribute__((interrupt)) void
+_div_isr(__attribute((unused)) struct interrupt_frame *frame) {
+  printf("div zero\r\n");
+  _done();
+}
+
+static __attribute__((interrupt)) void
+_ud_isr(__attribute((unused)) struct interrupt_frame *frame) {
+  printf("invalid opcode\r\n");
+  _done();
 }
 
 /**
@@ -102,9 +120,19 @@ void _start(void) {
   _kbd_driver = get_default_kbd_driver();
 
   // Set up basic timer and keyboard interrupts.
+  create_interrupt_gate(&gates[0], _div_isr);
+  create_interrupt_gate(&gates[6], _ud_isr);
+  create_interrupt_gate(&gates[14], _pf_isr);
   create_interrupt_gate(&gates[32], _timer_irq);
   create_interrupt_gate(&gates[33], _kb_irq);
   init_interrupts();
+
+  /* volatile int a = *(int *)5 * 1024 * 1024 * 1024; */
+  /* volatile int b = *(int *)0; */
+  int f = 3;
+  volatile int e = 5 / f;
+  int d = 0;
+  __attribute__((unused)) volatile int c = 5 / d;
 
   // Simple diagnostic shell.
   shell_init();
