@@ -65,7 +65,8 @@ struct page {
   // Set if allocated by the physical memory allocator.
   bool present : 1;
 
-  // Set if hole memory.
+  // Set if hole memory, or for bootloader-reclaimable memory before it has been
+  // reclaimed.
   bool unusable : 1;
 
   // For future use. We may expand the size of the `struct page` if necessary.
@@ -81,6 +82,14 @@ struct page {
  * based on the BIOS E820 function).
  */
 void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count);
+
+/**
+ * Free bootloader-reclaimable (Limine) memory. This should only be done once
+ * all dependencies on resources stored in bootloader-reclaimable memory are
+ * replaced/unneeded (e.g., kernel stack, page table).
+ */
+void phys_reclaim_bootloader_mem(struct limine_memmap_entry *init_mmap,
+                                 size_t entry_count);
 
 /**
  * Allocate a single physical page using a round-robin allocator.

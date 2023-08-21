@@ -55,6 +55,7 @@ void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
     GET_PMLE(pml2, pml2e, 21);
     assert(!pml2e->p);
     pml2e->p = true;
+    pml2e->ps = true;
     pml2e->addr = ((size_t)phys_addr & (PM_MAX_BIT - 1)) >> PG_SZ_BITS;
     pml2e->rw = true;
   } else {
@@ -71,6 +72,9 @@ void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
 #undef GET_PMLE
 }
 
+// TODO(jlam55555): Write diagnostic function to check if a page is mapped. To
+// use in debugger.
+
 /**
  * Helper function to map a region to 4KiB and 2MiB pages, as necessary.
  *
@@ -81,7 +85,6 @@ void _virt_map_region(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
                       size_t len) {
   assert(PG_ALIGNED(len));
   for (size_t i = 0; i < len;) {
-    // Hugepage
     bool is_hgpg = i + VM_HGPG_SZ <= len && VM_HGPG_ALIGNED(phys_addr + i) &&
                    VM_HGPG_ALIGNED(virt_addr + i);
     _virt_map_page(pml4, phys_addr + i, virt_addr + i, is_hgpg);
@@ -96,7 +99,7 @@ void _virt_create_hhdm(struct pmlx_entry *pml4,
        ++memmap_entry_i) {
     struct limine_memmap_entry *memmap_entry = init_mmap + memmap_entry_i;
     _virt_map_region(pml4, (void *)memmap_entry->base,
-                     (void *)(VM_HM_START + memmap_entry->base),
+                     (void *)(VM_HM_START | memmap_entry->base),
                      memmap_entry->length);
   }
 }
@@ -118,8 +121,7 @@ void _virt_create_kernel_map(struct pmlx_entry *pml4,
 
 // Switch to a new page table.
 static inline void _virt_set_pt(struct pmlx_entry *pml4) {
-  // Lower 12 bits of PML4 should all be zero.
-  assert(!((size_t)pml4 & 0xfff));
+  assert(PG_ALIGNED(pml4));
   __asm__ volatile("mov %0, %%cr3\n\t" : : "r"(pml4));
 }
 
@@ -143,19 +145,19 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // Need this for the video mapping at least.
   _virt_map_region(pml4, (void *)4096, (void *)4096, 1024 * 1024 - 4096);
 
-  // Low-memory.
+  // Address should be in low-memory.
   pml4 = (void *)((size_t)pml4 & ~VM_HM_START);
 
   // Switch to the new page table.
-  // TODO(jlam55555): Working here.
   _virt_set_pt(pml4);
 
-  // Build new stack and jump into it.
+  // Build new stack and jump into it. This will make this function noreturn.
   // TODO(jlam55555): Working here.
 
-  // Reclaim bootloader memory (don't need init_mmap anymore).
-  // TODO(jlam55555): Working here.
+  // Reclaim bootloader memory. At this point we need to be sure that we don't
+  // depend on any Limine services that lie in bootloader-reclaimable memory.
+  phys_reclaim_bootloader_mem(init_mmap, entry_count);
 
   // At the point of this function returning, we're at the top of a new stack
-  // that we just allocated.
+  // that we just allocated. Need some special [[noreturn]] logic.
 }

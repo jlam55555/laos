@@ -4,8 +4,9 @@
 #include "common/libc.h"
 
 #include <assert.h>
+#include <limine.h>
 
-// TODO(jlam): Handle hugepage allocation.
+// TODO(jlam55555): Handle hugepage allocation.
 
 /**
  * State variable singleton struct for the physical memory allocator.
@@ -28,6 +29,10 @@ static struct _phys_rr_allocator {
    * Note that unusable_pg is counted in the total_pg but not the allocated_pg.
    * That is, total_pg = allocated_pg + unusable_pg + <free pg>. This definition
    * may change in the future if a more convenient definition arises.
+   *
+   * Note also that unusable_pg includes bootloader reclaimable memory before it
+   * has been freed. This choice is somewhat arbitrary -- these pages could
+   * alternatively have been marked as allocated to prevent their use.
    */
   size_t total_sz;
   size_t total_pg;
@@ -84,6 +89,10 @@ static bool _phys_page_free(void *addr) {
  * only used during initialization and all the pages in this region are assumed
  * to be free.
  *
+ * For unusable pages, do not actually allocate -- we simply mark it as
+ * unusable. This is because we don't want to include unusable regions in the
+ * bookkeeping for allocatable pages.
+ *
  * If this assumption is false, we error.
  */
 static void _phys_region_alloc(void *addr, size_t pg_count, bool is_unusable) {
@@ -100,6 +109,22 @@ static void _phys_region_alloc(void *addr, size_t pg_count, bool is_unusable) {
   if (is_unusable) {
     _phys_allocator.unusable_pg += pg_count;
   }
+}
+
+/**
+ * Helper function for phys_reclaim_bootloader_mem(). Bootloader-reclaimable
+ * pages are marked unusable by _phys_region_alloc(). Once we're done with the
+ * bootloader-reclaimable memory, we can mark them as usable and update the
+ * unusable page count.
+ */
+static void _phys_region_mark_usable(void *addr, size_t pg_count) {
+  for (size_t i = 0; i < pg_count; ++i, addr += PG_SZ) {
+    size_t pg = (size_t)addr >> PG_SZ_BITS;
+    assert(!_phys_allocator.mem_bitmap[pg].present);
+    assert(_phys_allocator.mem_bitmap[pg].unusable);
+    _phys_allocator.mem_bitmap[pg].unusable = false;
+  }
+  _phys_allocator.unusable_pg -= pg_count;
 }
 
 /**
@@ -152,7 +177,8 @@ static void _phys_rr_allocator_init(void *addr, size_t mem_limit,
     }
     prev_end = (void *)(mmap_entry->base + mmap_entry->length);
 
-    // Mark unusable memory regions.
+    // Mark unusable memory regions. (This includes bootloader-reclaimable
+    // memory regions, which will be freed/marked usable later on.)
     if (mmap_entry->type != LIMINE_MEMMAP_USABLE) {
       _phys_region_alloc((void *)mmap_entry->base, PG_COUNT(mmap_entry->length),
                          true);
@@ -171,6 +197,11 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // mem_limit bytes * page/4096bytes * sizeof(struct page) bytes/page.
   size_t bm_sz = (mem_limit >> PG_SZ_BITS) * sizeof(struct page);
 
+  // For diagnostic purposes. This should be moved to a different diagnostic
+  // function.
+  printf("Maximum physical address=%lx\r\nstruct page array size=%lx\r\n",
+         mem_limit, bm_sz);
+
   // Allocate physical memory for bitmap in first usable region
   // large enough for it.
   void *mem_bitmap_paddr = NULL;
@@ -178,7 +209,13 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
     struct limine_memmap_entry *mmap_entry = init_mmap + mmap_entry_i;
 
     // Make sure region is usable. If not usable, we perform some
-    // normalization on the region.
+    // normalization on the region. The Limine spec guarantees that usable
+    // regions are page-aligned and usable, whereas neither are guaranteed for
+    // non-usable regions.
+    //
+    // TODO(jlam55555): Should separate the normalization logic out into a
+    // separate function. Currently we do it inline because it doesn't require
+    // an extra pass, but it's a little confusing to be included here.
     if (mmap_entry->type != LIMINE_MEMMAP_USABLE) {
       // Normalize region; make sure it's page-aligned. The Limine spec dictates
       // that entries that are not usable or bootloader-reclaimable may be
@@ -208,11 +245,23 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
 
   // Make sure this usable region lies within the identity-mapped region
   // provided by Limine (first four GiB), otherwise we will fall outside the VM
-  // address space.
+  // address space. This is not unsolvable, but it may be a little annoying to
+  // deal with.
   assert((size_t)mem_bitmap_paddr + bm_sz <= 4 * GiB);
 
   // Initialize the round robin allocator.
   _phys_rr_allocator_init(mem_bitmap_paddr, mem_limit, init_mmap, entry_count);
+}
+
+void phys_reclaim_bootloader_mem(struct limine_memmap_entry *init_mmap,
+                                 size_t entry_count) {
+  for (size_t mmap_entry_i = 0; mmap_entry_i < entry_count; ++mmap_entry_i) {
+    struct limine_memmap_entry *mmap_entry = init_mmap + mmap_entry_i;
+    if (mmap_entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE) {
+      _phys_region_mark_usable((void *)mmap_entry->base,
+                               PG_COUNT(mmap_entry->length));
+    }
+  }
 }
 
 /**
