@@ -39,6 +39,12 @@ _kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
 }
 
 static __attribute__((interrupt)) void
+_gp_isr(__attribute((unused)) struct interrupt_frame *frame) {
+  printf("general protection fault\r\n");
+  _done();
+}
+
+static __attribute__((interrupt)) void
 _pf_isr(__attribute((unused)) struct interrupt_frame *frame) {
   printf("page fault\r\n");
   _done();
@@ -67,9 +73,6 @@ void _start(void) {
   }
   struct limine_memmap_response *limine_memmap_response =
       _limine_memmap_request.response;
-
-  virt_mem_init(*limine_memmap_response->entries,
-                limine_memmap_response->entry_count);
 
   // Print out information about the current memory map.
   void *prev_end = NULL;
@@ -119,20 +122,24 @@ void _start(void) {
   // keyboard initialization code.
   _kbd_driver = get_default_kbd_driver();
 
-  // Set up basic timer and keyboard interrupts.
+  // Set up basic interrupts.
   create_interrupt_gate(&gates[0], _div_isr);
   create_interrupt_gate(&gates[6], _ud_isr);
+  create_interrupt_gate(&gates[13], _gp_isr);
   create_interrupt_gate(&gates[14], _pf_isr);
   create_interrupt_gate(&gates[32], _timer_irq);
   create_interrupt_gate(&gates[33], _kb_irq);
   init_interrupts();
 
+  virt_mem_init(*limine_memmap_response->entries,
+                limine_memmap_response->entry_count);
+
   /* volatile int a = *(int *)5 * 1024 * 1024 * 1024; */
   /* volatile int b = *(int *)0; */
-  int f = 3;
-  volatile int e = 5 / f;
-  int d = 0;
-  __attribute__((unused)) volatile int c = 5 / d;
+  /* int f = 3; */
+  /* volatile int e = 5 / f; */
+  /* int d = 0; */
+  /* __attribute__((unused)) volatile int c = 5 / d; */
 
   // Simple diagnostic shell.
   shell_init();

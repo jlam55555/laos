@@ -24,7 +24,7 @@
  * An identity map is not provided; use of the HHDM is preferred. The identity
  * map is only really useful before the initial page table is set up.
  *
- * virt_mem_init() is sets up the virtual memory manager, creates a new (4KiB)
+ * virt_mem_init() sets up the virtual memory manager, creates a new (4KiB)
  * kernel stack, and jump into that new stack. This is necessary because the old
  * kernel stack is located in bootloader-reclaimable memory (it is also large;
  * we follow the Linux convention that kernel stacks are 4KiB/1pg).
@@ -68,35 +68,13 @@ struct vm_area {
  * bootloader-reclaimable entries for now. (It has some useful information, such
  * as the kernel stack.)
  * 3. Swaps to the new page table.
- * 4. Instructs the physical memory manager to reclaim the reclaimable memory
+ * 4. Builds a new stack and jumps into it.
+ * 5. Instructs the physical memory manager to reclaim the reclaimable memory
  * sections from the initial mmap entries.
+ *
+ * [[noreturn]] because we're at the top a new stack, anything on the stack
+ * before will be obliterated.
  */
 void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count);
-
-/**
- * Reclaim bootloader-reclaimable memory.
- *
- * This has the subtle (?) implication that the kernel stack will be discarded,
- * since it lies in bootloader-reclaimable memory. As a result, a new kernel
- * stack will be allocated and jumped into at the end of this function.
- *
- * This could be folded into virt_mem_init(), but is kept separate to be more
- * flexible.
- */
-/* /\* __attribute__((noreturn)) *\/ void */
-/* virt_mem_reclaim(struct limine_memmap_entry *init_mmap, size_t
-   entry_count, */
-/*                  void *(cb)(void)); */
-
-/**
- * mmap-like functionality. Maps the contiguous memory region of `pg` pages
- * starting at `phys_ptr` to a contiguous virtual memory region, and return the
- * start of the virtual region.
- */
-/* void *virt_mem_map(void *phys_ptr, size_t pg); */
-
-/**
- * TODO(jlam55555): kmalloc and vmalloc interfaces.
- */
 
 #endif // MEM_VIRT_H

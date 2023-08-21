@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "arch/x86_64/pt.h" // VM_HM_START
+#include "arch/x86_64/registers.h"
 #include "common/libc.h"
 #include "mem/phys.h"
 
@@ -42,6 +43,7 @@ void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
     pmle->p = true;                                                            \
     pmle->addr =                                                               \
         ((size_t)_virt_alloc_pmlx_table() & (PM_MAX_BIT - 1)) >> PG_SZ_BITS;   \
+    pmle->rw = true;                                                           \
   }                                                                            \
   pmlnext = (void *)((pmle->addr << PG_SZ_BITS) | VM_HM_START);
 
@@ -54,6 +56,7 @@ void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
     assert(!pml2e->p);
     pml2e->p = true;
     pml2e->addr = ((size_t)phys_addr & (PM_MAX_BIT - 1)) >> PG_SZ_BITS;
+    pml2e->rw = true;
   } else {
     assert(PG_ALIGNED(phys_addr));
     assert(PG_ALIGNED(virt_addr));
@@ -62,6 +65,7 @@ void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
     assert(!pml1e->p);
     pml1e->p = true;
     pml1e->addr = ((size_t)phys_addr & (PM_MAX_BIT - 1)) >> PG_SZ_BITS;
+    pml1e->rw = true;
   }
 #undef GET_PMLNEXT
 #undef GET_PMLE
@@ -112,6 +116,13 @@ void _virt_create_kernel_map(struct pmlx_entry *pml4,
   }
 }
 
+// Switch to a new page table.
+static inline void _virt_set_pt(struct pmlx_entry *pml4) {
+  // Lower 12 bits of PML4 should all be zero.
+  assert(!((size_t)pml4 & 0xfff));
+  __asm__ volatile("mov %0, %%cr3\n\t" : : "r"(pml4));
+}
+
 /* __attribute__((noreturn)) */
 void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // Initialize physical memory. Note that this also normalizes init_mmap (see
@@ -128,27 +139,23 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // Create the kernel map.
   _virt_create_kernel_map(pml4, init_mmap, entry_count);
 
-  // Reclaim bootloader memory (don't need init_mmap anymore).
-  // TODO(jlam55555): Working here.
+  // Identity map low few pages (1MB).
+  // Need this for the video mapping at least.
+  _virt_map_region(pml4, (void *)4096, (void *)4096, 1024 * 1024 - 4096);
+
+  // Low-memory.
+  pml4 = (void *)((size_t)pml4 & ~VM_HM_START);
 
   // Switch to the new page table.
   // TODO(jlam55555): Working here.
+  _virt_set_pt(pml4);
 
-  // Build new stack and jump to it.
+  // Build new stack and jump into it.
   // TODO(jlam55555): Working here.
+
+  // Reclaim bootloader memory (don't need init_mmap anymore).
+  // TODO(jlam55555): Working here.
+
+  // At the point of this function returning, we're at the top of a new stack
+  // that we just allocated.
 }
-
-/* /\* __attribute__((noreturn)) *\/ void */
-/* virt_mem_reclaim(struct limine_memmap_entry *init_mmap, size_t entry_count,
- */
-/*                  void *(cb)(void)) { */
-/*   // TODO(jlam55555): Allocate and return to new stack, as old stack was in
- */
-/*   // reclaimed memory. */
-/* } */
-
-/* void *virt_mem_map(void *phys_ptr, size_t pg) { */
-/*   _virt_map_page(struct pmlx_entry * pml4, void *phys_addr, void *virt_addr,
- */
-/*                  bool is_hugepage); */
-/* } */
