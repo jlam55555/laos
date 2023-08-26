@@ -1,6 +1,9 @@
-#include <stdbool.h>
-
 #include "console.h"
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "common/util.h"
 
 // VGA video buffer memory address.
 static volatile char *_video_mem = (volatile char *)0xB8000;
@@ -29,10 +32,58 @@ static struct console _console = {
     .buf = _console_buf,
 };
 
-void _init_driver(struct console_driver *driver) {
-  driver->dev = &_console;
-  driver->dev->driver = driver;
-  driver->dev->cursor = _default_console_cursor;
+/**
+ * Enable VGA text mode hardware cursor.
+ *
+ * Copied from https://wiki.osdev.org/Text_Mode_Cursor.
+ */
+void _vga_cursor_enable(uint8_t cursor_start, uint8_t cursor_end) {
+  outb(0x0A, 0x3D4);
+  outb((inb(0x3D5) & 0xC0) | cursor_start, 0x3D5);
+
+  outb(0x0B, 0x3D4);
+  outb((inb(0x3D5) & 0xE0) | cursor_end, 0x3D5);
+}
+
+/**
+ * Move VGA text mode hardware cursor.
+ *
+ * Copied from https://wiki.osdev.org/Text_Mode_Cursor.
+ */
+void _vga_cursor_move(int row, int col) {
+  uint16_t pos = row * 80 + col;
+
+  outb(0x0F, 0x3D4);
+  outb((uint8_t)(pos & 0xFF), 0x3D5);
+  outb(0x0E, 0x3D4);
+  outb((uint8_t)((pos >> 8) & 0xFF), 0x3D5);
+}
+
+static void _console_refresh(struct console *);
+static void _init_driver(struct console_driver *driver) {
+  struct console *console = driver->dev = &_console;
+  console->driver = driver;
+  console->cursor = _default_console_cursor;
+
+  // Default color.
+  uint8_t default_color = 0x0f;
+  console->cursor.color = default_color;
+
+  // Fill with default color.
+  int r = console->spec.scrollback;
+  int c = console->spec.win_cols;
+  for (int i = 0; i < r; ++i) {
+    for (int j = 0; j < c; ++j) {
+      console->buf[i * 2 * c + 2 * j] = ' ';
+      console->buf[i * 2 * c + 2 * j + 1] = default_color;
+    }
+  }
+
+  // Initialize hardware cursor.
+  _vga_cursor_enable(10, 15);
+
+  // Draw to screen.
+  _console_refresh(console);
 }
 
 /**
@@ -54,19 +105,31 @@ static void _console_refresh(struct console *console) {
       _video_mem[i * 2 * c + j] = console->buf[(win_top + i) * 2 * c + j];
     }
   }
+  _vga_cursor_move(console->cursor.row - win_top, console->cursor.col);
 }
 
+static void _console_advance_row(struct console *, bool);
 static void _console_advance(struct console *, bool);
 static void _console_putchar(struct console *console, char c, bool refresh) {
-  // TODO(jlam55555): Implement special handling for ^J, ^M, ^H.
-
   // Update the scrollback buffer.
   struct console_cursor *cur = &console->cursor;
-  int pos = cur->row * 2 * console->spec.win_cols + 2 * cur->col;
-  console->buf[pos] = c;
-  console->buf[pos + 1] = cur->color;
 
-  _console_advance(console, false);
+  // Special handling for ^J ('\n'), ^M ('\r'), ^H ('\b').
+  if (c == '\n') {
+    _console_advance_row(console, false);
+  } else if (c == '\r') {
+    cur->col = 0;
+  } else if (c == '\b') {
+    if (cur->col) {
+      --cur->col;
+    }
+  } else {
+    int pos = cur->row * 2 * console->spec.win_cols + 2 * cur->col;
+    console->buf[pos] = c;
+    console->buf[pos + 1] = cur->color;
+
+    _console_advance(console, false);
+  }
   if (refresh) {
     _console_refresh(console);
   }
@@ -102,7 +165,7 @@ static void _console_scroll_abs(struct console *console, int win_top) {
         int pos1 = i * 2 * console->spec.win_cols + 2 * j;
         int pos2 = (i + new_line_count) * 2 * console->spec.win_cols + 2 * j;
         buf[pos1] = zero ? ' ' : buf[pos2];
-        buf[pos1 + 1] = zero ? 0x0 : buf[pos2 + 1];
+        buf[pos1 + 1] = zero ? 0x0f : buf[pos2 + 1];
       }
     }
 
@@ -120,19 +183,26 @@ static void _console_scroll(struct console *console, int lines) {
   _console_scroll_abs(console, console->cursor.win_top + lines);
 }
 
+static void _console_advance_row(struct console *console, bool refresh) {
+  // Note: if we're at the end of the scrollback buffer (i.e.,
+  // if term_cursor.row becomes equal to win_scrollback after
+  // the increment, it will temporarily be outside the allowable
+  // range of [0, win_scrollback). However, it should be promptly
+  // rectified by the call to `term_scroll()`.
+  if (++console->cursor.row ==
+      console->cursor.win_top + console->spec.win_rows) {
+    _console_scroll(console, 1);
+  }
+
+  if (refresh) {
+    _console_refresh(console);
+  }
+}
+
 static void _console_advance(struct console *console, bool refresh) {
   if (++console->cursor.col == console->spec.win_cols) {
     console->cursor.col = 0;
-
-    // Note: if we're at the end of the scrollback buffer (i.e.,
-    // if term_cursor.row becomes equal to win_scrollback after
-    // the increment, it will temporarily be outside the allowable
-    // range of [0, win_scrollback). However, it should be promptly
-    // rectified by the call to `term_scroll()`.
-    if (++console->cursor.row ==
-        console->cursor.win_top + console->spec.win_rows) {
-      _console_scroll(console, 1);
-    }
+    _console_advance_row(console, false);
   }
 
   if (refresh) {

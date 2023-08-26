@@ -31,7 +31,7 @@ $(eval $(call DEFAULT_VAR,CC,cc))
 $(eval $(call DEFAULT_VAR,LD,ld))
 
 # User controllable CFLAGS.
-CFLAGS ?= -O2 -pipe -Wall -Wextra
+CFLAGS ?= -O2 -Wall -Wextra
 
 # User controllable preprocessor flags. We set none by default.
 CPPFLAGS ?=
@@ -43,7 +43,7 @@ NASMFLAGS ?= -F dwarf
 LDFLAGS ?=
 
 # User controllable QEMU flags.
-QEMUFLAGS ?= -no-reboot -no-shutdown
+QEMUFLAGS ?= -no-reboot -no-shutdown -m 4G
 
 # Internal C flags that should not be changed by the user.
 override CFLAGS +=       \

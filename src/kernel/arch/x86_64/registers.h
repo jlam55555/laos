@@ -99,16 +99,24 @@ struct cr2_register {
   void *pfla;
 };
 
-// Note that there are two different interpretations
-// of the cr3 register depending on the cr4.pcide flag.
-// cr3_register_pcidne is for PCID not-enabled, and
-// cr3_register_pcide is for PCID enabled.
+/**
+ * Note that there are two different interpretations
+ * of the cr3 register depending on the cr4.pcide flag.
+ * cr3_register_pcidne is for PCID not-enabled, and
+ * cr3_register_pcide is for PCID enabled.
+ *
+ * For most purposes, we do not care about the PCID
+ * extension. According to the OSDev wiki
+ * (https://wiki.osdev.org/CPU_Registers_x86):
+ *     "Bits 0-11 of the physical base address are assumed
+ *     to be 0. Bits 3 and 4 of CR3 are only used when
+ *     accessing a PDE in 32-bit paging without PAE."
+ */
 struct cr3_register_pcidne {
   uint8_t : 3;
   uint8_t pwt : 1;
-  uint8_t : 1;
   uint8_t pcd : 1;
-  uint16_t : 6;
+  uint16_t : 7;
   uint64_t base : 52;
 } __attribute__((packed));
 

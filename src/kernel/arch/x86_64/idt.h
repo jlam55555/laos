@@ -1,5 +1,14 @@
-#ifndef IDT_H
-#define IDT_H
+/**
+ * Data structure and utilities for the IDT
+ * (interrupt descriptor table) on the x86_64 architecture.
+ *
+ * See also arch/x86_64/interrupt.h
+ */
+#ifndef ARCH_X86_64_IDT_H
+#define ARCH_X86_64_IDT_H
+
+#include <stddef.h>
+#include <stdint.h>
 
 struct idtr_desc {
   uint16_t sz;
@@ -36,4 +45,4 @@ inline void load_idtr(struct idtr_desc *idtr) {
   __asm__ volatile("lidt %0" : "=m"(*idtr));
 }
 
-#endif // IDT_H
+#endif // ARCH_X86_64_IDT_H

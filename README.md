@@ -23,11 +23,12 @@ sudo make limine-clean clean
 ### Features
 - [X] Limine bootloader (forked to jlam55555/limine to enable VGA text mode 3 by default)
 - [X] PS/2 Keyboard driver: read scancodes, translate to keycodes/ASCII and pass to input subsystem
-- [X] TTY layer: master side reads from input subsystem, writes to console; slave side can be used by processes; no ldisc/cooked mode
+- [X] TTY subsystem: basic line discipline, buffering core utilities, tty driver
 - [X] Console driver: write text to screen, with scrollback; interpret special characters like `^H`, `^M`, `^J`
-- [ ] Shell
-- [ ] Processes
-- [ ] Memory management
+- [X] Simple shell: run simple hardcoded commands
+- [ ] Synchronization primitives: mask interrupts/save IRQ state, spinlocks (for multicore)
+- [ ] Memory management: page fault handler, page table representation, page allocator, library functions for heap allocation
+- [ ] Processes: TODO
 
 ### Learning goals
 

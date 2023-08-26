@@ -1,0 +1,28 @@
+# Generated manually from Makefile.
+# Add additional include directories as needed.
+# In the future, may be good to auto-generate this with Bear.
+
+-O2
+-Wall
+-Wextra
+
+-std=c11
+-ffreestanding
+-fno-stack-protector
+-fno-stack-check
+-fno-lto
+-fno-pie
+-fno-pic
+-m64
+-march=x86-64
+-mabi=sysv
+-mno-80387
+-mno-mmx
+-mno-sse
+-mno-sse2
+-mno-red-zone
+-mcmodel=kernel
+-MMD
+
+-Isrc/kernel
+-Isrc/limine
