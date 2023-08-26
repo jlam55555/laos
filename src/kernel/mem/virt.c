@@ -158,20 +158,27 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
   void *new_stack =
       (void *)(((uint64_t)phys_page_alloc() | VM_HM_START) + PG_SZ);
 
+  phys_mem_print_stats();
+
   // Bootloader-reclaimed memory includes the stack. This means that we should
   // immediately switch to a new stack, and nothing should write to the stack in
   // the interim. (Alternatively, we could call this after switching stacks, but
   // that shouldn't be necessary.)
   phys_reclaim_bootloader_mem(init_mmap, entry_count);
 
-  // Switch stacks.
-  __asm__ volatile(
-      "mov %0, %%rsp\n\t" /* set stack  */
-      "push $0\n\t"       /* push fake %rip */
-      "jmp *%1\n\t"       /* jump to cb */
-      :
-      : "r"(new_stack), "r"(cb)
-      : /* We technically clobber %rsp, but this causes a warning. */);
+  phys_mem_print_stats();
+
+  // Switch stacks. We technically clobber %rsp, but listing it as a clobber
+  // gives a warning. Similarly, we cannot use memory-mode addressing for cb, as
+  // this will use %rsp-relative addressing. Just specifying a register operand
+  // is probably still not totally safe (if the register operand is set from a
+  // %rsp-relative address after %rsp is clobbered), but safe enough for our
+  // needs.
+  __asm__ volatile("mov %0, %%rsp\n\t" /* set stack  */
+                   "push $0\n\t"       /* push fake %rip */
+                   "jmp *%1\n\t"       /* jump to cb */
+                   :
+                   : "r"(new_stack), "r"(cb));
 
   __builtin_unreachable();
 }

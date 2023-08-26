@@ -15,7 +15,7 @@ static volatile struct limine_memmap_request _limine_memmap_request = {
     .revision = 0,
 };
 
-static void _done(void) {
+static __attribute__((noreturn)) void _done(void) {
   for (;;) {
     __asm__("hlt");
     shell_on_interrupt();
@@ -62,10 +62,18 @@ _ud_isr(__attribute((unused)) struct interrupt_frame *frame) {
   _done();
 }
 
+static __attribute__((noreturn)) void _run_shell(void) {
+  // Simple diagnostic shell.
+  shell_init();
+
+  // We're done, just wait for interrupt...
+  _done();
+}
+
 /**
  * Kernel entry point.
  */
-void _start(void) {
+__attribute__((noreturn)) void _start(void) {
   // Check the Limine requests.
   if (!_limine_memmap_request.response) {
     printf("Error: limine memmap request failed\r\n");
@@ -132,7 +140,7 @@ void _start(void) {
   init_interrupts();
 
   virt_mem_init(*limine_memmap_response->entries,
-                limine_memmap_response->entry_count, _start);
+                limine_memmap_response->entry_count, _run_shell);
 
   /* volatile int a = *(int *)5 * 1024 * 1024 * 1024; */
   /* volatile int b = *(int *)0; */
@@ -140,10 +148,4 @@ void _start(void) {
   /* volatile int e = 5 / f; */
   /* int d = 0; */
   /* __attribute__((unused)) volatile int c = 5 / d; */
-
-  // Simple diagnostic shell.
-  shell_init();
-
-  // We're done, just wait for interrupt...
-  _done();
 }
