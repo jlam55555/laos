@@ -125,14 +125,6 @@ static inline void _virt_set_pt(struct pmlx_entry *pml4) {
   __asm__ volatile("mov %0, %%cr3\n\t" : : "r"(pml4));
 }
 
-// Set up new stack and reclaim bootloader-reclaimable memory (in that order).
-//
-// Pure asm function because it's easier to do stack manipulation. Can probably
-// just write it all using extended asm but it's easier to prototype in asm.
-__attribute__((noreturn)) void
-_virt_mem_init_stage2(struct limine_memmap_entry *init_mmap, size_t entry_count,
-                      void *new_stack, void (*cb)(void));
-
 void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
                    void (*cb)(void)) {
   // Initialize physical memory. Note that this also normalizes init_mmap (see
@@ -166,5 +158,20 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
   void *new_stack =
       (void *)(((uint64_t)phys_page_alloc() | VM_HM_START) + PG_SZ);
 
-  _virt_mem_init_stage2(init_mmap, entry_count, new_stack, cb);
+  // Bootloader-reclaimed memory includes the stack. This means that we should
+  // immediately switch to a new stack, and nothing should write to the stack in
+  // the interim. (Alternatively, we could call this after switching stacks, but
+  // that shouldn't be necessary.)
+  phys_reclaim_bootloader_mem(init_mmap, entry_count);
+
+  // Switch stacks.
+  __asm__ volatile(
+      "mov %0, %%rsp\n\t" /* set stack  */
+      "push $0\n\t"       /* push fake %rip */
+      "jmp *%1\n\t"       /* jump to cb */
+      :
+      : "r"(new_stack), "r"(cb)
+      : /* We technically clobber %rsp, but this causes a warning. */);
+
+  __builtin_unreachable();
 }
