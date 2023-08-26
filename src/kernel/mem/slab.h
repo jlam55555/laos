@@ -6,11 +6,11 @@
  * possible implementation is to use a simple bitmap/buddy system allocator,
  * which uses less space but doesn't guarantee O(1) allocations.
  *
- * A slab allocator allows for allocations of a power-of-2 order, from 2^5 to
- * 2^17. A slab allocator (`struct slab_cache`) contains three linked-lists of
- * slab descriptors (`struct slab`): one for full slabs, one for partially-full
- * slabs, and one for empty slabs (candidates for freeing). Each slab comprises
- * three parts:
+ * A slab allocator allows for allocations of a power-of-2 order, from
+ * 2^SLAB_MIN_ORDER to 2^SLAB_MAX_ORDER. A slab allocator (`struct slab_cache`)
+ * contains three linked-lists of slab descriptors (`struct slab`): one for full
+ * slabs, one for partially-full slabs, and one for empty slabs (candidates for
+ * freeing). Each slab comprises three parts:
  * - The slab descriptor (metadata about the slab).
  * - The LIFO freelist.
  * - The physical backing page(s) for the slab elements.
@@ -24,13 +24,14 @@
  * mean swapping the freed element with the last-allocated element in the
  * freelist and decrementing A.
  *
- * The layout in memory is somewhat different for orders 5-9 and orders 10-17.
- * Orders 5-9 store their slab descriptor and LIFO freelist on the physical
- * backing page for the slab elements. Orders 10-17 store their slab descriptor
- * and LIFO freelist in memory chunks allocated using the lower-order slab
- * allocators. The latter works well because it causes less wasted space on the
- * physical backing pages, and the freelists are small because there are few
- * elements per slab.
+ * The layout in memory is somewhat different for "small" orders (SLAB_MIN_ORDER
+ * <= order <= SLAB_SMALL_MAX_ORDER) and "large" orders (SLAB_LARGE_MIN_ORDER <=
+ * order <= SLAB_MAX_ORDER). Small-order slabs store their slab descriptor and
+ * LIFO freelist on the physical backing page for the slab elements. Large order
+ * slabs store their slab descriptor and LIFO freelist in memory chunks
+ * allocated using the lower-order slab allocators. The latter works well
+ * because it causes less wasted space on the physical backing pages, and the
+ * freelists are small because there are few elements per slab.
  *
  * The slab allocators underlie the familiar `kmalloc()` interface, which
  * delegates the work to the appropriate slab allocator.
@@ -45,26 +46,46 @@
 #define MEM_SLAB_H
 
 #include <stddef.h>
+#include <stdint.h>
 
-#define SLAB_MIN_ORDER 5
-#define SLAB_MAX_ORDER 17
-#define SLAB_SMALL_MAX_ORDER 9
+#define SLAB_MIN_ORDER 4
+#define SLAB_MAX_ORDER 16
+#define SLAB_SMALL_MAX_ORDER 6
 #define SLAB_LARGE_MIN_ORDER (SLAB_SMALL_MAX_ORDER + 1)
 
 /**
- * TODO(jlam55555): Working here.
+ * Slab descriptor. This is stored one of the linked-lists in a struct
+ * slab_cache allocator. The slab descriptor physically either resides at the
+ * beginning of the physical backing page of the slab (for small-order slabs) or
+ * was allocated using a lower-order slab allocator (for large-order slabs).
  */
 struct slab {
   // TODO(jlam55555): Implement `struct list_head`.
-  struct slab *next;
-};
+  struct slab *next; // 8
+  struct slab *prev; // 8
+  void *data;        // 8
+
+  uint8_t order;     // 1
+  uint8_t elements;  // 1
+  uint8_t allocated; // 1
+
+  // This must come last.
+  uint8_t freelist[0];
+} __attribute__((packed));
+
+/**
+ * Slab allocator for a particular order. Maintains a cache of struct slabs for
+ * this order.
+ */
 struct slab_cache {
   unsigned order;
 
-  // These have length 1 to act as sentinel nodes.
-  struct slab empty_slabs[1];
-  struct slab partial_slabs[1];
-  struct slab full_slabs[1];
+  uint8_t pages;
+  uint8_t elements;
+
+  struct slab *empty_slabs;
+  struct slab *partial_slabs;
+  struct slab *full_slabs;
 };
 
 /**
@@ -74,7 +95,11 @@ struct slab_cache {
 void slab_allocators_init(void);
 
 /**
- * Allocate memory up to 128KB.
+ * Allocate memory region up to 128KiB.
+ *
+ * Note that allocations >4KiB (PG_SZ) are not guaranteed to be fast or even to
+ * succeed. This uses a very naive implementation for contiguous multi-physical
+ * page allocations.
  *
  * Returns NULL if the memory size is too large or no memory can be allocated.
  */

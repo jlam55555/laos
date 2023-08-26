@@ -7,6 +7,7 @@
 #include "common/libc.h"
 #include "drivers/console.h"
 #include "mem/phys.h"
+#include "mem/slab.h"
 
 /**
  * Allocates and returns a pointer to an empty (zeroed) PMLx table.
@@ -131,6 +132,9 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
   // Initialize physical memory. Note that this also normalizes init_mmap (see
   // phys.c for more details).
   phys_mem_init(init_mmap, entry_count);
+
+  // Initialize slab allocator.
+  slab_allocators_init();
 
   // Create an entry page table.
   struct pmlx_entry *pml4 = VM_TO_HHDM(_virt_alloc_pmlx_table());

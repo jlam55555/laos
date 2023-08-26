@@ -60,7 +60,7 @@
 
 // Forward declarations. Mostly for extra information needed for different
 // context bits.
-struct slab;
+struct slab_cache;
 
 /**
  * Used to track information about each physical memory page. Linux has a struct
@@ -86,8 +86,8 @@ struct page {
   // Used to store metadata about the page. Depends on the type of page this is.
   // More entries may be added as more page types appear
   union {
-    // Slab descriptor for a slab-allocated object on this physical page.
-    struct slab *slab_desc; // 8
+    // Object's parent cache for a slab-allocated object on this physical page.
+    struct slab_cache *slab_cache; // 8
   } context;
 
   // For future use. Pad this to 64 bytes as is done in Linux.
