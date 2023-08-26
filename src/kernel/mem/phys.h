@@ -1,10 +1,17 @@
 /**
- * Physical memory manager (PMM). Simple bitmap allocator, may make this into a
- * buddy allocator in the future.
+ * Physical memory manager (PMM). Currently, this PMM keeps a struct page array
+ * which keeps track of some metadata for all the physical pages of RAM.
+ * Allocation simply involves a sequential scan of this array until a free page
+ * is found.
  *
- * Most of these functions, except for phys_mem_print_stats(), should only be
- * called by the virtual memory manager so that they are properly mapped into
- * VM.
+ * This is clearly not fast. Augmenting this with a bitmap or buddy allocator
+ * will allow for faster allocations. A LIFO allocator similar to the slab
+ * allocator may also work, but this requires much more storage (O(log2(N))) per
+ * physical page.
+ *
+ * Currently, there is not much metadata associated with each physical page, but
+ * this may change in the future. E.g., refcounts/the number of free entries in
+ * a PML* table may be helpful for freeing physical pages.
  *
  * N.B. Assuming `sizeof(struct page) == 64` like it is in Linux, we will start
  * running into problems with this allocator and the stock Linux
@@ -51,6 +58,10 @@
 #define TiB (GiB * KiB)
 #define PiB (TiB * KiB)
 
+// Forward declarations. Mostly for extra information needed for different
+// context bits.
+struct slab;
+
 /**
  * Used to track information about each physical memory page. Linux has a struct
  * of the same name with the same purpose.
@@ -69,12 +80,18 @@ struct page {
   // reclaimed.
   bool unusable : 1;
 
-  // For future use. We may expand the size of the `struct page` if necessary.
-  uint64_t : 62;
+  // For future use.
+  uint64_t : 62; // 8
 
-  // TODO(jlam55555): Remove this, for testing. Make `struct page` 64 bytes like
-  // in Linux.
-  uint64_t test[7];
+  // Used to store metadata about the page. Depends on the type of page this is.
+  // More entries may be added as more page types appear
+  union {
+    // Slab descriptor for a slab-allocated object on this physical page.
+    struct slab *slab_desc; // 8
+  } context;
+
+  // For future use. Pad this to 64 bytes as is done in Linux.
+  /* uint64_t test[6]; // 48 */
 } __attribute__((packed));
 
 /**
