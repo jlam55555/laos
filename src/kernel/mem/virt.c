@@ -125,8 +125,16 @@ static inline void _virt_set_pt(struct pmlx_entry *pml4) {
   __asm__ volatile("mov %0, %%cr3\n\t" : : "r"(pml4));
 }
 
-/* __attribute__((noreturn)) */
-void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
+// Set up new stack and reclaim bootloader-reclaimable memory (in that order).
+//
+// Pure asm function because it's easier to do stack manipulation. Can probably
+// just write it all using extended asm but it's easier to prototype in asm.
+__attribute__((noreturn)) void
+_virt_mem_init_stage2(struct limine_memmap_entry *init_mmap, size_t entry_count,
+                      void *new_stack, void (*cb)(void));
+
+void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
+                   void (*cb)(void)) {
   // Initialize physical memory. Note that this also normalizes init_mmap (see
   // phys.c for more details).
   phys_mem_init(init_mmap, entry_count);
@@ -141,9 +149,12 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // Create the kernel map.
   _virt_create_kernel_map(pml4, init_mmap, entry_count);
 
-  // Identity map low few pages (1MB).
-  // Need this for the video mapping at least.
-  _virt_map_region(pml4, (void *)4096, (void *)4096, 1024 * 1024 - 4096);
+  // Map in video memory.
+  // TODO(jlam55555): Create a hardware memory map list to do this more
+  // flexibly. For now we don't need to map in any other regions in the memory
+  // holes.
+  void *video_mem = (void *)0xB8000;
+  _virt_map_region(pml4, video_mem, video_mem, PG_SZ);
 
   // Address should be in low-memory.
   pml4 = (void *)((size_t)pml4 & ~VM_HM_START);
@@ -151,13 +162,9 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // Switch to the new page table.
   _virt_set_pt(pml4);
 
-  // Build new stack and jump into it. This will make this function noreturn.
-  // TODO(jlam55555): Working here.
+  // Allocate the new stack. Go to top of stack and put in HM.
+  void *new_stack =
+      (void *)(((uint64_t)phys_page_alloc() | VM_HM_START) + PG_SZ);
 
-  // Reclaim bootloader memory. At this point we need to be sure that we don't
-  // depend on any Limine services that lie in bootloader-reclaimable memory.
-  phys_reclaim_bootloader_mem(init_mmap, entry_count);
-
-  // At the point of this function returning, we're at the top of a new stack
-  // that we just allocated. Need some special [[noreturn]] logic.
+  _virt_mem_init_stage2(init_mmap, entry_count, new_stack, cb);
 }

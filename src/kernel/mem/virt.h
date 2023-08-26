@@ -72,9 +72,11 @@ struct vm_area {
  * 5. Instructs the physical memory manager to reclaim the reclaimable memory
  * sections from the initial mmap entries.
  *
- * [[noreturn]] because we're at the top a new stack, anything on the stack
+ * `noreturn` because we're at the top a new stack, anything on the stack
  * before will be obliterated.
  */
-void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count);
+__attribute__((noreturn)) void
+virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
+              void (*cb)(void));
 
 #endif // MEM_VIRT_H

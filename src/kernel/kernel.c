@@ -132,7 +132,7 @@ void _start(void) {
   init_interrupts();
 
   virt_mem_init(*limine_memmap_response->entries,
-                limine_memmap_response->entry_count);
+                limine_memmap_response->entry_count, _start);
 
   /* volatile int a = *(int *)5 * 1024 * 1024 * 1024; */
   /* volatile int b = *(int *)0; */
