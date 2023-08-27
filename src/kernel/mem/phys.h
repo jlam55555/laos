@@ -60,7 +60,7 @@
 
 // Forward declarations. Mostly for extra information needed for different
 // context bits.
-struct slab_cache;
+struct slab;
 
 /**
  * Used to track information about each physical memory page. Linux has a struct
@@ -86,8 +86,8 @@ struct page {
   // Used to store metadata about the page. Depends on the type of page this is.
   // More entries may be added as more page types appear
   union {
-    // Object's parent cache for a slab-allocated object on this physical page.
-    struct slab_cache *slab_cache; // 8
+    // The slab object, if this is a backing page for a slab.
+    struct slab *slab; // 8
   } context;
 
   // For future use. Pad this to 64 bytes as is done in Linux.
@@ -122,9 +122,26 @@ void *phys_page_alloc(void);
 void phys_page_free(void *pg);
 
 /**
+ * Allocate multiple contiguous pages. Simple but inefficient.
+ */
+void *phys_page_alloc_order(unsigned order);
+
+/**
+ * Free multiple contiguous pages.
+ */
+void phys_page_free_order(void *pg, unsigned order);
+
+/**
  * Print statistics about physical memory (e.g., available, reserved, usable,
  * etc.)
  */
 void phys_mem_print_stats(void);
+
+/**
+ * Get `struct page` for a physical address. This currently doesn't do any
+ * checks on the input address, but the return value should be checked in case
+ * checks are added in the future.
+ */
+struct page *phys_get_page(void *pg);
 
 #endif // MEM_PHYS_H

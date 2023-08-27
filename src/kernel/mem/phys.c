@@ -299,6 +299,21 @@ void *phys_page_alloc(void) {
 
 void phys_page_free(void *pg) { assert(_phys_page_free(pg)); }
 
+void *phys_page_alloc_order(unsigned order) {
+  // TODO(jlam55555): Working here.
+  return NULL;
+}
+
+void phys_page_free_order(void *pg, unsigned order) {
+  // TODO(jlam55555): Working here.
+  assert(false);
+}
+
+struct page *phys_get_page(void *pg) {
+  // TODO(jlam55555): Do assertions on pg here.
+  return &_phys_allocator.mem_bitmap[(size_t)pg >> PG_SZ_BITS];
+}
+
 void phys_mem_print_stats(void) {
   printf("\rPhysical page usage %u%%: %lu/%lu pages (%lu/%lu bytes)\r\n",
          _phys_allocator.allocated_pg * 100 /

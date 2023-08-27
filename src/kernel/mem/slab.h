@@ -50,7 +50,7 @@
 
 #define SLAB_MIN_ORDER 4
 #define SLAB_MAX_ORDER 16
-#define SLAB_SMALL_MAX_ORDER 6
+#define SLAB_SMALL_MAX_ORDER 7
 #define SLAB_LARGE_MIN_ORDER (SLAB_SMALL_MAX_ORDER + 1)
 
 /**
@@ -61,12 +61,11 @@
  */
 struct slab {
   // TODO(jlam55555): Implement `struct list_head`.
-  struct slab *next; // 8
-  struct slab *prev; // 8
-  void *data;        // 8
+  struct slab *next;         // 8
+  struct slab *prev;         // 8
+  struct slab_cache *parent; // 8
+  void *data;                // 8
 
-  uint8_t order;     // 1
-  uint8_t elements;  // 1
   uint8_t allocated; // 1
 
   // This must come last.
@@ -74,18 +73,22 @@ struct slab {
 } __attribute__((packed));
 
 /**
- * Slab allocator for a particular order. Maintains a cache of struct slabs for
- * this order.
+ * Slab allocator for a particular order. Maintains a cache of `struct slab`s
+ * for this order.
  */
 struct slab_cache {
-  unsigned order;
+  unsigned order; // 4
 
-  uint8_t pages;
-  uint8_t elements;
+  uint8_t pages;    // 1
+  uint8_t elements; // 1
 
-  struct slab *empty_slabs;
-  struct slab *partial_slabs;
-  struct slab *full_slabs;
+  // Precomputed offset from page start. Only useful for data in small-order
+  // slabs. (Always 0 for large-order slabs.)
+  uint16_t offset; // 2
+
+  struct slab *empty_slabs;   // 8
+  struct slab *partial_slabs; // 8
+  struct slab *full_slabs;    // 8
 };
 
 /**
