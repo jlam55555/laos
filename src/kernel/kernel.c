@@ -10,6 +10,10 @@
 #include "drivers/kbd.h"
 #include "mem/virt.h"
 
+#ifdef TEST
+#include "test/test.h"
+#endif
+
 static volatile struct limine_memmap_request _limine_memmap_request = {
     .id = LIMINE_MEMMAP_REQUEST,
     .revision = 0,
@@ -63,8 +67,12 @@ _ud_isr(__attribute((unused)) struct interrupt_frame *frame) {
 }
 
 static __attribute__((noreturn)) void _run_shell(void) {
+#ifdef TEST
+  run_test();
+#else
   // Simple diagnostic shell.
   shell_init();
+#endif
 
   // We're done, just wait for interrupt...
   _done();
@@ -82,6 +90,7 @@ __attribute__((noreturn)) void _start(void) {
   struct limine_memmap_response *limine_memmap_response =
       _limine_memmap_request.response;
 
+#ifdef DEBUG
   // Print out information about the current memory map.
   void *prev_end = NULL;
   for (size_t i = 0; i < limine_memmap_response->entry_count; ++i) {
@@ -124,6 +133,7 @@ __attribute__((noreturn)) void _start(void) {
     printf("base: %lx, len: %lx, type: %s\r\n", mmap_entry->base,
            mmap_entry->length, type_str);
   }
+#endif // DEBUG
 
   // Initialize keyboard driver. Note that we want to do this
   // before enabling interrupts, due to the nature of the

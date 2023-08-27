@@ -3,7 +3,9 @@ OUT_DIR := out
 LIMINE_SRC_DIR := $(SRC_DIR)/limine
 LIMINE_DIR := $(LIMINE_SRC_DIR)/bin
 KERNEL_SRC_DIR := $(SRC_DIR)/kernel
-KERNEL_OUT_DIR := $(OUT_DIR)/kernel
+
+# Purposely not :=
+KERNEL_OUT_DIR = $(OUT_DIR)/kernel
 
 IMAGE_HDD := image.hdd
 IMAGE_ISO := image.iso
@@ -44,6 +46,28 @@ LDFLAGS ?=
 
 # User controllable QEMU flags.
 QEMUFLAGS ?= -no-reboot -no-shutdown -m 4G
+
+# Adding tests if necessary. Specify using `make RUNTEST=xyz ...`
+# Make sure to `make clean` if toggling this flag to prevent an inconsistent
+# build.
+# Also creates a new build variant.
+ifneq ($(RUNTEST),)
+    override CFLAGS += -DTEST -DRUNTEST_$(RUNTEST)
+    override OUT_DIR := $(OUT_DIR).test_$(RUNTEST)
+endif
+
+# Debug mode. Specify using `make DEBUG=1 ...`
+# Make sure to `make clean` if switching between debug and non-debug modes to
+# prevent an inconsistent build.
+# Also creates a new build variant.
+ifneq ($(DEBUG),)
+    override CFLAGS += -DDEBUG -g -save-temps=obj
+    override NASMFLAGS += -DDEBUG -g
+    override OUT_DIR := $(OUT_DIR).debug
+endif
+
+# See final output directory. https://stackoverflow.com/a/16489377/2397327
+$(info $$OUT_DIR is [${OUT_DIR}])
 
 # Internal C flags that should not be changed by the user.
 override CFLAGS +=       \
@@ -101,11 +125,6 @@ $(KERNEL_OUT_DIR)/$(KERNEL): $(OBJ) $(KERNEL_OUT_DIR)
 # Alias for building the kernel.
 kernel: $(KERNEL_OUT_DIR)/$(KERNEL)
 	@ # Prevent the default cc rule from being run.
-
-# Adding debug flags to the kernel.
-kernel_debug: CFLAGS += -DDEBUG -g -save-temps=obj
-kernel_debug: NASMFLAGS += -DDEBUG -g
-kernel_debug: kernel
 
 # Include header dependencies.
 -include $(HEADER_DEPS)
