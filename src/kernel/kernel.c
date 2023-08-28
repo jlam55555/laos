@@ -68,7 +68,7 @@ _ud_isr(__attribute((unused)) struct interrupt_frame *frame) {
 
 static __attribute__((noreturn)) void _run_shell(void) {
 #ifdef TEST
-  run_test();
+  run_tests();
 #else
   // Simple diagnostic shell.
   shell_init();
