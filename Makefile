@@ -45,16 +45,33 @@ NASMFLAGS ?= -F dwarf
 LDFLAGS ?=
 
 # User controllable QEMU flags.
-QEMUFLAGS ?= -no-reboot -no-shutdown -m 4G
+QEMUFLAGS ?= -m 4G
 
-# Adding tests if necessary. Specify using `make RUNTEST=xyz ...`
-# Make sure to `make clean` if toggling this flag to prevent an inconsistent
-# build.
-# Also creates a new build variant.
-# For now, $(RUNTEST) must not contain spaces.
+# QEMU allows commas in comma-separated argument lists if the commas are
+# duplicated. See QEMU_FLAGS and run_{hdd,iso} for usages.
+COMMA := ,
+QEMU_OUT_DIR = $(subst $(COMMA),$(COMMA)$(COMMA),$(OUT_DIR))
+
+# Adding tests if necessary. Specify using `make RUNTEST=<test_selection> ...`
+# Creates a new build variant to avoid inconsistent builds. Use the special
+# test selection "RUNTEST=all" to run all tests. Tests are written to the
+# test.out file in the output directory.
 ifneq ($(RUNTEST),)
-    override CFLAGS += -DRUNTEST=$(RUNTEST)
+    ifeq ($(RUNTEST),all)
+        override CFLAGS += -DRUNTEST='' -DSERIAL
+    else
+        override CFLAGS += -DRUNTEST=$(RUNTEST) -DSERIAL
+    endif
     override OUT_DIR := $(OUT_DIR).test_$(RUNTEST)
+
+    # tee-like functionality. See https://superuser.com/a/1412150
+    override QEMUFLAGS += -display none \
+        -chardev stdio,id=char0,logfile=$(QEMU_OUT_DIR)/test.out,signal=off \
+        -serial chardev:char0
+else ifneq($(SERIAL),)
+    # This doesn't create a different variant. Should it?
+    override CFLAGS += -DSERIAL
+    override QEMUFLAGS += -serial stdio
 endif
 
 # Debug mode. Specify using `make DEBUG=1 ...`
@@ -65,6 +82,9 @@ ifneq ($(DEBUG),)
     override CFLAGS += -DDEBUG -g -save-temps=obj
     override NASMFLAGS += -DDEBUG -g
     override OUT_DIR := $(OUT_DIR).debug
+    ifeq ($(DEBUG),i)
+        override QEMUFLAGS += -s -S -no-reboot -no-shutdown
+    endif
 endif
 
 # See final output directory. https://stackoverflow.com/a/16489377/2397327
@@ -207,11 +227,13 @@ $(OUT_DIR)/$(IMAGE_ISO): $(KERNEL_OUT_DIR)/$(KERNEL) limine
 
 .PHONY:
 run_hdd: $(OUT_DIR)/$(IMAGE_HDD)
-	qemu-system-x86_64 $(QEMUFLAGS) -drive file=$<,media=disk,format=raw
+	qemu-system-x86_64 $(QEMUFLAGS) \
+	    -drive file=$(QEMU_OUT_DIR)/$(IMAGE_HDD),media=disk,format=raw
 
 .PHONY:
 run_iso: $(OUT_DIR)/$(IMAGE_ISO)
-	qemu-system-x86_64 $(QEMUFLAGS) $<
+	qemu-system-x86_64 $(QEMUFLAGS) \
+	    -drive file=$(QEMU_OUT_DIR)/$(IMAGE_ISO),media=disk,format=raw
 
 # Remove object files and the final executable.
 .PHONY: clean

@@ -160,7 +160,9 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
   assert(new_stack);
   new_stack += PG_SZ;
 
+#ifdef DEBUG
   phys_mem_print_stats();
+#endif // DEBUG
 
   // Bootloader-reclaimed memory includes the stack. This means that we should
   // immediately switch to a new stack, and nothing should write to the stack in
@@ -168,7 +170,9 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
   // that shouldn't be necessary.)
   phys_reclaim_bootloader_mem(init_mmap, entry_count);
 
+#ifdef DEBUG
   phys_mem_print_stats();
+#endif // DEBUG
 
   // Switch stacks. We technically clobber %rsp, but listing it as a clobber
   // gives a warning. Similarly, we cannot use memory-mode addressing for cb, as

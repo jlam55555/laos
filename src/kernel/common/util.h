@@ -22,6 +22,10 @@ inline void outb(uint8_t value, uint16_t port) {
   __asm__("outb %[value], %[port]" : : [value] "a"(value), [port] "Nd"(port));
 }
 
+inline void outw(uint16_t value, uint16_t port) {
+  __asm__("outw %[value], %[port]" : : [value] "a"(value), [port] "Nd"(port));
+}
+
 inline uint8_t inb(uint16_t port) {
   uint8_t rv;
   __asm__ volatile("inb %1, %0" : "=a"(rv) : "d"(port));
@@ -30,7 +34,7 @@ inline uint8_t inb(uint16_t port) {
 
 // Stringify a macro. E.g., one that comes from a -Dmacro=xyz gcc arg.
 // https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html
-#define _macro2str(macro) #macro
+#define _macro2str(macro...) #macro
 #define macro2str(macro) _macro2str(macro)
 
 #endif // COMMON_UTIL_H

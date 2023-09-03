@@ -17,14 +17,30 @@
  *
  * Build a kernel that only runs a test after initialization using:
  *
- *     make RUNTEST=<testname> kernel
+ *     make RUNTEST=<test_selection> kernel
  *
  * This will generate a build variant just for running that test. Note that test
  * selection occurs at runtime, not compile-time, so the build may succeed but
  * test selection may fail.
  *
- * TODO(jlam55555): Interactively running tests.
- * TODO(jlam55555): Specify which tests to run.
+ * Test selection follows a very simple pattern matcher:
+ * - pattern="": Empty pattern matches everything.
+ * - pattern="foo": Match any test whose name contains "foo".
+ * - pattern="^bar": Match any test whose name starts with "bar".
+ * - pattern="baz$": Match any test whose name ends with "baz".
+ * - pattern="pat1,pat2": Match any test which matches either pat1 or pat2.
+ *
+ * Test names must only include characters that form valid identifiers: letters,
+ * digits, and underscores. Double underscores can be used for namespacing:
+ * e.g., the "selection matcher" test within the testing module may be indicated
+ * by a test whose name is "test__selection_matcher". Matching all tests within
+ * a namespace "foonamespace" can be done with the pattern "^foonamespace__".
+ *
+ * All lines printed by the test subsystem are prefixed by TEST_PREFIX. This is
+ * intended to make the plaintext output heuristically-parsable by an external
+ * script, and should be made unique enough to avoid likely collisions with
+ * test stdout logging.
+ *
  * TODO(jlam55555): Multiple "safety" levels for tests.
  */
 #ifndef TEST_TEST_H
@@ -34,10 +50,12 @@
 
 #include "common/libc.h"
 
-// TODO(jlam55555): Working here.
+#define TEST_PREFIX "##!! "
+
 #define TEST_ASSERT(cond)                                                      \
   if (!(cond)) {                                                               \
-    printf("ASSERTION FAILED (%s:%u): %s\r\n", __FILE__, __LINE__, #cond);     \
+    printf(TEST_PREFIX "ASSERTION FAILED (%s:%u): %s\r\n", __FILE__, __LINE__, \
+           #cond);                                                             \
     *test_passed = false;                                                      \
     return;                                                                    \
   }
