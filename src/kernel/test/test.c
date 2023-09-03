@@ -101,23 +101,23 @@ void run_tests(const char *selection) {
 #endif // RUNTEST
 }
 
-DEFINE_TEST(test__pattern_matcher) {
-  const char *pat1 = "test__";
+DEFINE_TEST(test, pattern_matcher) {
+  const char *pat1 = "test.";
   const char *pat2 = "";
-  const char *pat3 = "^test__";
+  const char *pat3 = "^test.";
   const char *pat4 = "pattern_matcher";
   const char *pat5 = "pattern_matcher$";
-  const char *pat6 = "test__pattern_matcher$";
-  const char *pat7 = "^test__pattern_matcher$";
-  const char *pat8 = "^test__pattern_matcher";
-  const char *pat9 = "^1test__pattern_matcher";
-  const char *pat10 = "^test__pattern_matcher1";
-  const char *pat11 = "test__pattern_matcher1$";
-  const char *pat12 = "test__pattern_matcher1";
-  const char *pat13 = "__";
+  const char *pat6 = "test.pattern_matcher$";
+  const char *pat7 = "^test.pattern_matcher$";
+  const char *pat8 = "^test.pattern_matcher";
+  const char *pat9 = "^1test.pattern_matcher";
+  const char *pat10 = "^test.pattern_matcher1";
+  const char *pat11 = "test.pattern_matcher1$";
+  const char *pat12 = "test.pattern_matcher1";
+  const char *pat13 = ".";
   const char *pat14 = "match";
 
-  const struct test_info test1 = {.name = "test__pattern_matcher"};
+  const struct test_info test1 = {.name = "test.pattern_matcher"};
 
   TEST_ASSERT(_test_is_match(&test1, pat1));
   TEST_ASSERT(_test_is_match(&test1, pat2));
@@ -134,7 +134,7 @@ DEFINE_TEST(test__pattern_matcher) {
   TEST_ASSERT(_test_is_match(&test1, pat13));
   TEST_ASSERT(_test_is_match(&test1, pat14));
 
-  const struct test_info test2 = {.name = "test__foo"};
+  const struct test_info test2 = {.name = "test.foo"};
 
   TEST_ASSERT(_test_is_match(&test2, pat1));
   TEST_ASSERT(_test_is_match(&test2, pat2));
@@ -151,14 +151,14 @@ DEFINE_TEST(test__pattern_matcher) {
   TEST_ASSERT(_test_is_match(&test2, pat13));
   TEST_ASSERT(!_test_is_match(&test2, pat14));
 
-  const struct test_info test3 = {.name = "bar__hello"};
+  const struct test_info test3 = {.name = "bar.hello"};
 
   TEST_ASSERT(!_test_is_match(&test3, pat1));
   TEST_ASSERT(_test_is_match(&test3, pat2));
   TEST_ASSERT(!_test_is_match(&test3, pat3));
 }
 
-DEFINE_TEST(test__conjunctive_simple_patterns) {
+DEFINE_TEST(test, conjunctive_simple_patterns) {
   const char *pat1 = "foo";
   const char *pat2 = "bar";
   const char *pat3 = "foo,bar";
@@ -175,12 +175,12 @@ DEFINE_TEST(test__conjunctive_simple_patterns) {
   TEST_ASSERT(_test_is_match(&test2, pat3));
 }
 
-DEFINE_TEST(test__conjunctive_complex_patterns) {
-  const char *pat1 = "^foo$";
+DEFINE_TEST(test, conjunctive_complex_patterns) {
+  const char *pat1 = "^foo.hi$";
   const char *pat2 = "ba";
-  const char *pat3 = "^foo$,ba";
+  const char *pat3 = "^foo.hi$,ba";
 
-  const struct test_info test1 = {.name = "foo"};
+  const struct test_info test1 = {.name = "foo.hi"};
   const struct test_info test2 = {.name = "bar"};
 
   TEST_ASSERT(_test_is_match(&test1, pat1));

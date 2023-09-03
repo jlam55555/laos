@@ -1,16 +1,23 @@
 /**
- * Very simple test runner. To define a new test, create a new file in this
- * directory called "mytestname_test.cc". The file should look like:
+ * Very simple test runner. To define a new integration or unit test, create a
+ * new file in this directory called "mytestname_test.cc". The file should look
+ * like:
  *
  *    #include "test/test.h"
  *
- *    DEFINE_TEST(foo) {
+ *    DEFINE_TEST(namespace, foo) {
  *        TEST_ASSERT(1 == 2);
  *    }
  *
- *    DEFINE_TEST(bar) {
+ *    DEFINE_TEST(namespace1, namespace2, bar) {
  *        TEST_ASSERT(3 == 3);
  *    }
+ *
+ * This will generate tests named "namespace.foo" and
+ * "namespace1.namespace2.bar", respectively.
+ *
+ * For unit tests of internal/private functions, define the tests in the same
+ * file as the functions to test.
  *
  * Automatic test discovery based on:
  * https://gist.github.com/nickrolfe/ffc9b1c02381b9dc17c975b98db42172
@@ -29,12 +36,12 @@
  * - pattern="^bar": Match any test whose name starts with "bar".
  * - pattern="baz$": Match any test whose name ends with "baz".
  * - pattern="pat1,pat2": Match any test which matches either pat1 or pat2.
+ * - pattern="^ns.": Match any test in namespace "ns".
  *
  * Test names must only include characters that form valid identifiers: letters,
- * digits, and underscores. Double underscores can be used for namespacing:
- * e.g., the "selection matcher" test within the testing module may be indicated
- * by a test whose name is "test__selection_matcher". Matching all tests within
- * a namespace "foonamespace" can be done with the pattern "^foonamespace__".
+ * digits, and underscores. Namespaces are denoted using periods. (You could
+ * also create a separate namespacing system using e.g., double underscores, but
+ * I don't foresee this being useful on top of the existing namespace system.)
  *
  * All lines printed by the test subsystem are prefixed by TEST_PREFIX. This is
  * intended to make the plaintext output heuristically-parsable by an external
@@ -70,14 +77,17 @@ struct test_info {
   test_fn fn;
 };
 
-#define DEFINE_TEST(test_name)                                                 \
-  static void test_##test_name(bool *test_passed); /* fwd declaration */       \
-  static const struct test_info test_info_##test_name                          \
+#define _define_test(test_name_id, test_name_str)                              \
+  static void test_##test_name_id(bool *test_passed); /* fwd declaration */    \
+  static const struct test_info test_info_##test_name_id                       \
       __attribute__((used, section("test_rodata"))) = {                        \
-          .name = #test_name,                                                  \
-          .fn = test_##test_name,                                              \
+          .name = test_name_str,                                               \
+          .fn = test_##test_name_id,                                           \
   };                                                                           \
-  static void test_##test_name(bool *test_passed) /* fn body */
+  static void test_##test_name_id(bool *test_passed) /* fn body */
+
+#define DEFINE_TEST(ns, ...)                                                   \
+  _define_test(ns##__##__VA_ARGS__, #ns "." #__VA_ARGS__)
 
 /**
  * Run all tests, or run tests with the given name.
