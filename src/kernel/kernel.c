@@ -8,6 +8,7 @@
 #include "common/util.h"
 #include "diag/shell.h"
 #include "drivers/kbd.h"
+#include "drivers/serial.h"
 #include "mem/virt.h"
 
 #ifdef RUNTEST
@@ -148,6 +149,10 @@ __attribute__((noreturn)) void _start(void) {
   create_interrupt_gate(&gates[32], _timer_irq);
   create_interrupt_gate(&gates[33], _kb_irq);
   init_interrupts();
+
+#ifdef SERIAL
+  serial_init();
+#endif // SERIAL
 
   virt_mem_init(*limine_memmap_response->entries,
                 limine_memmap_response->entry_count, _run_shell);

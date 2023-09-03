@@ -71,7 +71,7 @@ ifneq ($(RUNTEST),)
 else ifneq($(SERIAL),)
     # This doesn't create a different variant. Should it?
     override CFLAGS += -DSERIAL
-    override QEMUFLAGS += -serial stdio
+    override QEMUFLAGS += -serial stdio -display none
 endif
 
 # Debug mode. Specify using `make DEBUG=1 ...`

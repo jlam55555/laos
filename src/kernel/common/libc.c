@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "drivers/serial.h"
 #include "drivers/term.h"
 
 // Shamelessly stolen from the Limine bare bones OSDev wiki:
@@ -308,6 +309,10 @@ static inline void _term_writer(char c, __attribute__((unused)) char *_buf,
   }
   struct term_driver *term_driver = get_default_term_driver();
   term_driver->slave_write(term_driver->dev, &c, 1);
+#ifdef SERIAL
+  // Also write to serial port. For now, also write to video buf.
+  serial_putchar(c);
+#endif // SERIAL
 }
 
 // This returns the number of characters that would be printed
