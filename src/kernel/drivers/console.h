@@ -9,6 +9,7 @@
 #ifndef DRIVERS_CONSOLE_H
 #define DRIVERS_CONSOLE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 /**
@@ -58,6 +59,9 @@ struct console {
   struct console_cursor cursor;
   char *buf;
   struct console_driver *driver;
+
+  // Disabled until memory mappings are set up.
+  bool enabled;
 };
 
 /**
@@ -68,6 +72,9 @@ struct console_driver {
   void (*init_driver)(struct console_driver *);
   void (*scroll)(struct console *, int);
   void (*write)(struct console *, const char *, size_t);
+
+  // Only can be enabled after the memory region is properly mapped.
+  void (*enable)(struct console *);
 };
 
 struct console_driver *get_default_console_driver(void);
