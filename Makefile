@@ -51,8 +51,9 @@ QEMUFLAGS ?= -no-reboot -no-shutdown -m 4G
 # Make sure to `make clean` if toggling this flag to prevent an inconsistent
 # build.
 # Also creates a new build variant.
+# For now, $(RUNTEST) must not contain spaces.
 ifneq ($(RUNTEST),)
-    override CFLAGS += -DTEST -DRUNTEST_$(RUNTEST)
+    override CFLAGS += -DRUNTEST=$(RUNTEST)
     override OUT_DIR := $(OUT_DIR).test_$(RUNTEST)
 endif
 

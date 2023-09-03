@@ -28,4 +28,9 @@ inline uint8_t inb(uint16_t port) {
   return rv;
 }
 
+// Stringify a macro. E.g., one that comes from a -Dmacro=xyz gcc arg.
+// https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html
+#define _macro2str(macro) #macro
+#define macro2str(macro) _macro2str(macro)
+
 #endif // COMMON_UTIL_H

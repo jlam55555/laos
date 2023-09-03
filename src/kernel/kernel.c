@@ -10,9 +10,9 @@
 #include "drivers/kbd.h"
 #include "mem/virt.h"
 
-#ifdef TEST
+#ifdef RUNTEST
 #include "test/test.h"
-#endif
+#endif // RUNTEST
 
 static volatile struct limine_memmap_request _limine_memmap_request = {
     .id = LIMINE_MEMMAP_REQUEST,
@@ -67,12 +67,12 @@ _ud_isr(__attribute((unused)) struct interrupt_frame *frame) {
 }
 
 static __attribute__((noreturn)) void _run_shell(void) {
-#ifdef TEST
-  run_tests();
-#else
+#ifdef RUNTEST
+  run_tests(macro2str(RUNTEST));
+#else  // RUNTEST
   // Simple diagnostic shell.
   shell_init();
-#endif
+#endif // RUNTEST
 
   // We're done, just wait for interrupt...
   _done();

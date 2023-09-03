@@ -19,7 +19,9 @@
  *
  *     make RUNTEST=<testname> kernel
  *
- * This will generate a build variant just for running that test.
+ * This will generate a build variant just for running that test. Note that test
+ * selection occurs at runtime, not compile-time, so the build may succeed but
+ * test selection may fail.
  *
  * TODO(jlam55555): Interactively running tests.
  * TODO(jlam55555): Specify which tests to run.
@@ -28,7 +30,6 @@
 #ifndef TEST_TEST_H
 #define TEST_TEST_H
 
-#ifdef TEST
 #include <assert.h>
 
 #include "common/libc.h"
@@ -65,8 +66,6 @@ struct test_info {
  *
  * TODO(jlam55555): Determine how to specify tests.
  */
-void run_tests(void);
-
-#endif
+void run_tests(const char *selection);
 
 #endif // TEST_TEST_H
