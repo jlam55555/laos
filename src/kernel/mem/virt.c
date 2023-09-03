@@ -2,7 +2,7 @@
 
 #include <assert.h>
 
-#include "arch/x86_64/pt.h" // VM_HM_START
+#include "arch/x86_64/pt.h"
 #include "arch/x86_64/registers.h"
 #include "common/libc.h"
 #include "drivers/console.h"
@@ -101,8 +101,7 @@ void _virt_create_hhdm(struct pmlx_entry *pml4,
        ++memmap_entry_i) {
     struct limine_memmap_entry *memmap_entry = init_mmap + memmap_entry_i;
     _virt_map_region(pml4, (void *)memmap_entry->base,
-                     (void *)(VM_HM_START | memmap_entry->base),
-                     memmap_entry->length);
+                     VM_TO_HHDM(memmap_entry->base), memmap_entry->length);
   }
 }
 
@@ -134,8 +133,7 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
   phys_mem_init(init_mmap, entry_count);
 
   // Create an entry page table.
-  struct pmlx_entry *pml4 =
-      (void *)((size_t)_virt_alloc_pmlx_table() | VM_HM_START);
+  struct pmlx_entry *pml4 = VM_TO_HHDM(_virt_alloc_pmlx_table());
 
   // Create a HHDM.
   _virt_create_hhdm(pml4, init_mmap, entry_count);
@@ -150,19 +148,17 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
   void *video_mem = (void *)0xB8000;
   _virt_map_region(pml4, video_mem, VM_TO_HHDM(video_mem), PG_SZ);
 
-  // Address should be in low-memory.
-  pml4 = (void *)((size_t)pml4 & ~VM_HM_START);
-
-  // Switch to the new page table.
-  _virt_set_pt(pml4);
+  // Switch to the new page table, which should be a physical address.
+  _virt_set_pt(VM_TO_DIRECT(pml4));
 
   // Video memory is now mapped in.
   struct console_driver *console_driver = get_default_console_driver();
   console_driver->enable(console_driver->dev);
 
   // Allocate the new stack. Go to top of stack and put in HM.
-  void *new_stack =
-      (void *)(((uint64_t)phys_page_alloc() | VM_HM_START) + PG_SZ);
+  void *new_stack = phys_page_alloc();
+  assert(new_stack);
+  new_stack += PG_SZ;
 
   phys_mem_print_stats();
 

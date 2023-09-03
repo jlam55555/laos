@@ -156,7 +156,7 @@ static void _phys_rr_allocator_init(void *addr, size_t mem_limit,
   _phys_allocator.needle = 0;
 
   // Use HM version of address.
-  _phys_allocator.mem_bitmap = (struct page *)(VM_HM_START | (size_t)addr);
+  _phys_allocator.mem_bitmap = VM_TO_HHDM(addr);
 
   // Initialize bitmap. bm_sz = "bitmap size"
   size_t bm_sz = _phys_allocator.total_pg * sizeof(struct page);
