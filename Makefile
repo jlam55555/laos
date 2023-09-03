@@ -72,12 +72,20 @@ else ifneq($(SERIAL),)
     # This doesn't create a different variant. Should it?
     override CFLAGS += -DSERIAL
     override QEMUFLAGS += -serial stdio -display none
+else ifneq($(SERIAL),)
+    # This doesn't create a different variant. Should it?
+    override CFLAGS += -DSERIAL
+    override QEMUFLAGS += -serial stdio
 endif
 
 # Debug mode. Specify using `make DEBUG=1 ...`
 # Make sure to `make clean` if switching between debug and non-debug modes to
 # prevent an inconsistent build.
 # Also creates a new build variant.
+#
+# Use DEBUG=i for the `run_hdd`/`run_iso` targets if you want to run with
+# interactive debugging (`run_gdb`). Make sure to use the same variant flags
+# so that the correct image variant is targeted.
 ifneq ($(DEBUG),)
     override CFLAGS += -DDEBUG -g -save-temps=obj
     override NASMFLAGS += -DDEBUG -g
@@ -234,6 +242,12 @@ run_hdd: $(OUT_DIR)/$(IMAGE_HDD)
 run_iso: $(OUT_DIR)/$(IMAGE_ISO)
 	qemu-system-x86_64 $(QEMUFLAGS) \
 	    -drive file=$(QEMU_OUT_DIR)/$(IMAGE_ISO),media=disk,format=raw
+
+# For debug builds with DEBUG=i. Make sure to run with the same variant args as
+# the build.
+.PHONY:
+run_gdb:
+	gdb -ex "target remote localhost:1234" -ex "file $(KERNEL_OUT_DIR)/$(KERNEL)"
 
 # Remove object files and the final executable.
 .PHONY: clean
