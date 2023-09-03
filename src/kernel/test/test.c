@@ -10,9 +10,9 @@ const struct test_info *const tests_begin = &__start_test_rodata;
 const struct test_info *const tests_end = &__stop_test_rodata;
 
 // Internal-only helper function to match against a single clause of a
-// conjunctive selection.
+// disjunctive selection.
 //
-// Assumes there are no conjunctions (no ',') in the pattern.
+// Assumes there are no disjunctions (no ',') in the pattern.
 bool _test_is_match_single(const struct test_info *test, const char *selection,
                            size_t selection_len) {
   // Empty selection matches all patterns.
@@ -158,7 +158,7 @@ DEFINE_TEST(test, pattern_matcher) {
   TEST_ASSERT(!_test_is_match(&test3, pat3));
 }
 
-DEFINE_TEST(test, conjunctive_simple_patterns) {
+DEFINE_TEST(test, disjunctive_simple_patterns) {
   const char *pat1 = "foo";
   const char *pat2 = "bar";
   const char *pat3 = "foo,bar";
@@ -175,7 +175,7 @@ DEFINE_TEST(test, conjunctive_simple_patterns) {
   TEST_ASSERT(_test_is_match(&test2, pat3));
 }
 
-DEFINE_TEST(test, conjunctive_complex_patterns) {
+DEFINE_TEST(test, disjunctive_complex_patterns) {
   const char *pat1 = "^foo.hi$";
   const char *pat2 = "ba";
   const char *pat3 = "^foo.hi$,ba";
