@@ -50,7 +50,7 @@ _check_stk_size(void) {
 }
 
 void _print_pt(struct pmlx_entry *pmlx, int level, void *prev_va) {
-  pmlx = (void *)((size_t)pmlx | VM_HM_START);
+  pmlx = VM_TO_HHDM(pmlx);
   for (uint64_t i = 0; i < (VM_PG_SZ / sizeof *pmlx); ++i) {
     if (!pmlx[i].p) {
       continue;

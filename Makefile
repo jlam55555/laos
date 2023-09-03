@@ -127,7 +127,7 @@ $(KERNEL_OUT_DIR)/%.o: $(KERNEL_SRC_DIR)/%.asm
 
 $(LIMINE_DIR)/limine:
 	$(LIMINE_SRC_DIR)/bootstrap
-	(cd $(LIMINE_SRC_DIR) && ./configure --enable-all --disable-uefi-aarch64)
+	(cd $(LIMINE_SRC_DIR) && ./configure --enable-all --disable-uefi-aarch64 --disable-uefi-riscv64)
 	make -j16 -C $(LIMINE_SRC_DIR)
 
 limine: $(LIMINE_DIR)/limine
@@ -139,52 +139,44 @@ limine-clean:
 
 .ONESHELL:
 $(OUT_DIR)/$(IMAGE_HDD): $(KERNEL_OUT_DIR)/$(KERNEL) limine
-	# Create an empty zeroed out 64MiB image file.
+	# Create an empty zeroed-out 64MiB image file.
 	dd if=/dev/zero bs=1M count=0 seek=64 of=$@
+
 	# Create a GPT partition table.
-	parted -s $@ mklabel gpt
-	# Create an ESP partition that spans the whole disk.
-	parted -s $@ mkpart ESP fat32 2048s 100%
-	parted -s $@ set 1 esp on
+	sgdisk $@ -n 1:2048 -t 1:ef00
+
 	# Install the Limine BIOS stages onto the image.
 	$(LIMINE_DIR)/limine bios-install $@
-	# Mount the loopback device.
-	USED_LOOPBACK=$$(sudo losetup -Pf --show $@)
-	# Format the ESP partition as FAT32.
-	sudo mkfs.fat -F 32 $${USED_LOOPBACK}p1
-	# Mount the partition itself.
-	mkdir -p $(OUT_DIR)/img_mount
-	sudo mount $${USED_LOOPBACK}p1 $(OUT_DIR)/img_mount
-	# Copy the relevant files over.
-	sudo mkdir -p $(OUT_DIR)/img_mount/EFI/BOOT
-	sudo cp -v \
+
+	# Format the image as fat32.
+	mformat -i $@@@1M
+
+	# Make /EFI and /EFI/BOOT an MSDOS subdirectory.
+	mmd -i $@@@1M ::/EFI ::/EFI/BOOT
+
+	# Copy over the relevant files
+	mcopy -i $@@@1M \
 		$(KERNEL_OUT_DIR)/$(KERNEL) \
 		$(SRC_DIR)/limine.cfg \
-		$(LIMINE_DIR)/limine.sys \
-		$(OUT_DIR)/img_mount/
-	sudo cp -v \
-		$(LIMINE_DIR)/BOOTX64.EFI \
-		$(OUT_DIR)/img_mount/EFI/BOOT/
-	# Sync system cache and unmount partition and loopback device.
-	sync
-	sudo umount $(OUT_DIR)/img_mount
-	sudo losetup -d $${USED_LOOPBACK}
+		$(LIMINE_DIR)/limine-bios.sys ::/
+	mcopy -i $@@@1M $(LIMINE_DIR)/BOOTX64.EFI ::/EFI/BOOT
+	mcopy -i $@@@1M $(LIMINE_DIR)/BOOTIA32.EFI ::/EFI/BOOT
 
 $(OUT_DIR)/$(IMAGE_ISO): $(KERNEL_OUT_DIR)/$(KERNEL) limine
 	mkdir -p $(OUT_DIR)/iso_root
 	cp -v $(KERNEL_OUT_DIR)/$(KERNEL) \
 		$(SRC_DIR)/limine.cfg \
-		$(LIMINE_DIR)/limine.sys \
-		$(LIMINE_DIR)/limine-cd.bin \
-		$(LIMINE_DIR)/limine-cd-efi.bin \
+		$(LIMINE_DIR)/limine-bios.sys \
+		$(LIMINE_DIR)/limine-bios-cd.bin \
+		$(LIMINE_DIR)/limine-uefi-cd.bin \
 		$(OUT_DIR)/iso_root
 	# Create the bootable ISO.
 	xorriso -as mkisofs \
-		-b limine-cd.bin \
+		-b limine-bios-cd.bin \
 		-no-emul-boot \
 		-boot-load-size 4 \
 		-boot-info-table \
-		--efi-boot limine-cd-efi.bin \
+		--efi-boot limine-uefi-cd.bin \
 		-efi-boot-part \
 		--efi-boot-image \
 		--protective-msdos-label \
@@ -195,7 +187,7 @@ $(OUT_DIR)/$(IMAGE_ISO): $(KERNEL_OUT_DIR)/$(KERNEL) limine
 
 .PHONY:
 run_hdd: $(OUT_DIR)/$(IMAGE_HDD)
-	qemu-system-x86_64 $(QEMUFLAGS) $<
+	qemu-system-x86_64 $(QEMUFLAGS) -drive file=$<,media=disk,format=raw
 
 .PHONY:
 run_iso: $(OUT_DIR)/$(IMAGE_ISO)

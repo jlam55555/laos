@@ -3,10 +3,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "arch/x86_64/pt.h"
 #include "common/util.h"
 
 // VGA video buffer memory address.
-static volatile char *_video_mem = (volatile char *)0xB8000;
+static volatile char *_video_mem = (volatile char *)VM_TO_HHDM(0xB8000);
 
 // Video memory.
 static const struct console_spec _console_spec = {
@@ -30,6 +31,7 @@ static const struct console_cursor _default_console_cursor = {
 static struct console _console = {
     .spec = _console_spec,
     .buf = _console_buf,
+    .enabled = false,
 };
 
 /**
@@ -97,6 +99,10 @@ static void _init_driver(struct console_driver *driver) {
  * but this will be more complicated and error-prone.
  */
 static void _console_refresh(struct console *console) {
+  if (!console->enabled) {
+    return;
+  }
+
   int r = console->spec.win_rows;
   int c = console->spec.win_cols;
   int win_top = console->cursor.win_top;
@@ -140,6 +146,11 @@ static void _console_write(struct console *console, const char *buf,
   for (size_t i = 0; i < len; ++i) {
     _console_putchar(console, buf[i], false);
   }
+  _console_refresh(console);
+}
+
+static void _console_enable(struct console *console) {
+  console->enabled = true;
   _console_refresh(console);
 }
 
@@ -214,6 +225,7 @@ static struct console_driver _console_driver = {
     .init_driver = _init_driver,
     .scroll = _console_scroll,
     .write = _console_write,
+    .enable = _console_enable,
 };
 
 struct console_driver *get_default_console_driver(void) {

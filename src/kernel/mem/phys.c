@@ -52,6 +52,7 @@ static struct _phys_rr_allocator {
  * Returns true iff the physical page is free.
  */
 static bool _phys_page_alloc(void *addr) {
+  addr = VM_TO_DIRECT(addr);
   assert(PG_ALIGNED(addr));
   size_t pg = (size_t)addr >> PG_SZ_BITS;
   assert(pg < _phys_allocator.total_pg);
@@ -155,15 +156,15 @@ static void _phys_rr_allocator_init(void *addr, size_t mem_limit,
   _phys_allocator.needle = 0;
 
   // Use HM version of address.
-  _phys_allocator.mem_bitmap = (struct page *)(VM_HM_START | (size_t)addr);
+  _phys_allocator.mem_bitmap = VM_TO_HHDM(addr);
 
   // Initialize bitmap. bm_sz = "bitmap size"
   size_t bm_sz = _phys_allocator.total_pg * sizeof(struct page);
-  memset(addr, 0, bm_sz);
+  memset(_phys_allocator.mem_bitmap, 0, bm_sz);
 
   // Mark bitmap pages as allocated. We use the physical address here rather
   // than the HHDM address.
-  _phys_region_alloc(addr, PG_COUNT(bm_sz), false);
+  _phys_region_alloc(_phys_allocator.mem_bitmap, PG_COUNT(bm_sz), false);
 
   // Mark unusable regions in the bitmap.
   void *prev_end = NULL;
@@ -290,7 +291,9 @@ void *phys_page_alloc(void) {
   // pages are used in a LIFO manner.
   void *phys_addr = (void *)((size_t)_phys_allocator.needle << PG_SZ_BITS);
   assert(_phys_page_alloc(phys_addr));
-  return phys_addr;
+
+  // Return HHDM address.
+  return VM_TO_HHDM(phys_addr);
 }
 
 void phys_page_free(void *pg) { assert(_phys_page_free(pg)); }

@@ -55,6 +55,10 @@ _Static_assert(VM_CANON_BITS == VM_HM_START,
 // Similar to the PG_ALIGNED macro.
 #define VM_HGPG_ALIGNED(sz) (!((size_t)(sz) & (VM_HGPG_SZ - 1)))
 
+// Convert addr to/from HHDM version.
+#define VM_TO_DIRECT(addr) (void *)((uint64_t)(addr) & ~VM_HM_START)
+#define VM_TO_HHDM(addr) (void *)((uint64_t)(addr) | VM_HM_START)
+
 /**
  * Page-map level X table (levels 2-4).
  *
