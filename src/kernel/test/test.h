@@ -5,16 +5,15 @@
  *
  *    #include "test/test.h"
  *
- *    DEFINE_TEST(namespace, foo) {
+ *    DEFINE_TEST(ns1, foo) {
  *        TEST_ASSERT(1 == 2);
  *    }
  *
- *    DEFINE_TEST(namespace1, namespace2, bar) {
+ *    DEFINE_TEST(ns2, bar) {
  *        TEST_ASSERT(3 == 3);
  *    }
  *
- * This will generate tests named "namespace.foo" and
- * "namespace1.namespace2.bar", respectively.
+ * This will generate tests named "ns1.foo" and "ns2.bar", respectively.
  *
  * For unit tests of internal/private functions, define the tests in the same
  * file as the functions to test.
@@ -39,9 +38,9 @@
  * - pattern="^ns.": Match any test in namespace "ns".
  *
  * Test names must only include characters that form valid identifiers: letters,
- * digits, and underscores. Namespaces are denoted using periods. (You could
- * also create a separate namespacing system using e.g., double underscores, but
- * I don't foresee this being useful on top of the existing namespace system.)
+ * digits, and underscores. Namespaces are denoted using periods but only
+ * support one level of grouping. (You could also create a separate namespacing
+ * system using e.g., double underscores if need be.)
  *
  * All lines printed by the test subsystem are prefixed by TEST_PREFIX. This is
  * intended to make the plaintext output heuristically-parsable by an external
@@ -86,8 +85,7 @@ struct test_info {
   };                                                                           \
   static void test_##test_name_id(bool *test_passed) /* fn body */
 
-#define DEFINE_TEST(ns, ...)                                                   \
-  _define_test(ns##__##__VA_ARGS__, #ns "." #__VA_ARGS__)
+#define DEFINE_TEST(ns, test) _define_test(ns##__##test, #ns "." #test)
 
 /**
  * Run all tests, or run tests with the given name.

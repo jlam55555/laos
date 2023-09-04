@@ -68,11 +68,7 @@ ifneq ($(RUNTEST),)
     override QEMUFLAGS += -display none \
         -chardev stdio,id=char0,logfile=$(QEMU_OUT_DIR)/test.out,signal=off \
         -serial chardev:char0
-else ifneq($(SERIAL),)
-    # This doesn't create a different variant. Should it?
-    override CFLAGS += -DSERIAL
-    override QEMUFLAGS += -serial stdio -display none
-else ifneq($(SERIAL),)
+else ifneq ($(SERIAL),)
     # This doesn't create a different variant. Should it?
     override CFLAGS += -DSERIAL
     override QEMUFLAGS += -serial stdio

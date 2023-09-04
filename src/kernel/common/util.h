@@ -32,8 +32,23 @@ inline uint8_t inb(uint16_t port) {
   return rv;
 }
 
-// Stringify a macro. E.g., one that comes from a -Dmacro=xyz gcc arg.
-// https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html
+/**
+ * Join strings with a delimiter. Add more as necessary. All parameters should
+ * be string literals.
+ *
+ * Note that the end result is not parenthesized into a single expression.
+ */
+#define JOIN2(delim, a, b) a delim b
+#define JOIN3(delim, a, ...) a delim JOIN2(__VA_ARGS__)
+#define JOIN4(delim, a, ...) a delim JOIN3(__VA_ARGS__)
+#define JOIN5(delim, a, ...) a delim JOIN4(__VA_ARGS__)
+#define JOIN6(delim, a, ...) a delim JOIN5(__VA_ARGS__)
+#define JOIN7(delim, a, ...) a delim JOIN6(__VA_ARGS__)
+#define JOIN8(delim, a, ...) a delim JOIN7(__VA_ARGS__)
+
+/** Stringify a macro. E.g., one that comes from a -Dmacro=xyz gcc arg.
+ * https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html
+ */
 #define _macro2str(macro...) #macro
 #define macro2str(macro) _macro2str(macro)
 
