@@ -198,10 +198,11 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // mem_limit bytes * page/4096bytes * sizeof(struct page) bytes/page.
   size_t bm_sz = (mem_limit >> PG_SZ_BITS) * sizeof(struct page);
 
-  // For diagnostic purposes. This should be moved to a different diagnostic
-  // function.
+#ifdef DEBUG
+  // For diagnostic purposes.
   printf("Maximum physical address=%lx\r\nstruct page array size=%lx\r\n",
          mem_limit, bm_sz);
+#endif // DEBUG
 
   // Allocate physical memory for bitmap in first usable region
   // large enough for it.

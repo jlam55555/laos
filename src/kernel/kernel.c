@@ -8,7 +8,12 @@
 #include "common/util.h"
 #include "diag/shell.h"
 #include "drivers/kbd.h"
+#include "drivers/serial.h"
 #include "mem/virt.h"
+
+#ifdef RUNTEST
+#include "test/test.h"
+#endif // RUNTEST
 
 static volatile struct limine_memmap_request _limine_memmap_request = {
     .id = LIMINE_MEMMAP_REQUEST,
@@ -63,8 +68,12 @@ _ud_isr(__attribute((unused)) struct interrupt_frame *frame) {
 }
 
 static __attribute__((noreturn)) void _run_shell(void) {
+#ifdef RUNTEST
+  run_tests(macro2str(RUNTEST));
+#else  // RUNTEST
   // Simple diagnostic shell.
   shell_init();
+#endif // RUNTEST
 
   // We're done, just wait for interrupt...
   _done();
@@ -82,6 +91,7 @@ __attribute__((noreturn)) void _start(void) {
   struct limine_memmap_response *limine_memmap_response =
       _limine_memmap_request.response;
 
+#ifdef DEBUG
   // Print out information about the current memory map.
   void *prev_end = NULL;
   for (size_t i = 0; i < limine_memmap_response->entry_count; ++i) {
@@ -124,6 +134,7 @@ __attribute__((noreturn)) void _start(void) {
     printf("base: %lx, len: %lx, type: %s\r\n", mmap_entry->base,
            mmap_entry->length, type_str);
   }
+#endif // DEBUG
 
   // Initialize keyboard driver. Note that we want to do this
   // before enabling interrupts, due to the nature of the
@@ -138,6 +149,10 @@ __attribute__((noreturn)) void _start(void) {
   create_interrupt_gate(&gates[32], _timer_irq);
   create_interrupt_gate(&gates[33], _kb_irq);
   init_interrupts();
+
+#ifdef SERIAL
+  serial_init();
+#endif // SERIAL
 
   virt_mem_init(*limine_memmap_response->entries,
                 limine_memmap_response->entry_count, _run_shell);

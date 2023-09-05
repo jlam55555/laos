@@ -5,6 +5,7 @@
 #include "drivers/console.h"
 #include "drivers/term.h"
 #include "mem/phys.h"
+#include "test/test.h"
 
 #define SHELL_INPUT_BUF_SZ 4095
 
@@ -43,6 +44,10 @@ void _shell_dispatch(const char *cmd) {
   } else if (!strncmp(cmd, "pa", SHELL_INPUT_BUF_SZ)) {
     // Allocate a random page. For testing purposes.
     printf("\rret=%lx\r\n", phys_page_alloc());
+  } else if (!strncmp(cmd, "rt", strlen("rt"))) {
+    // Get argument 2. Need to write a vector-like library.
+    // TODO(jlam55555): This is pretty unsafe.
+    run_tests(cmd + strlen("rt") + 1);
   } else {
     printf("\rUnknown command.\r\n");
   }

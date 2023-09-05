@@ -23,7 +23,6 @@ SECTIONS
     . = 0xffffffff80000000;
  
     .text : {
-        *(.realmode) /* Let's see if this works. */
         *(.text .text.*)
     } :text
  
@@ -32,6 +31,7 @@ SECTIONS
  
     .rodata : {
         *(.rodata .rodata.*)
+        *(.test_rodata) /* Test descriptors for automatic test detection. */
     } :rodata
  
     /* Move to the next memory page for .data */

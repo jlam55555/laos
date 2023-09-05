@@ -3,7 +3,9 @@ OUT_DIR := out
 LIMINE_SRC_DIR := $(SRC_DIR)/limine
 LIMINE_DIR := $(LIMINE_SRC_DIR)/bin
 KERNEL_SRC_DIR := $(SRC_DIR)/kernel
-KERNEL_OUT_DIR := $(OUT_DIR)/kernel
+
+# Purposely not :=
+KERNEL_OUT_DIR = $(OUT_DIR)/kernel
 
 IMAGE_HDD := image.hdd
 IMAGE_ISO := image.iso
@@ -43,7 +45,54 @@ NASMFLAGS ?= -F dwarf
 LDFLAGS ?=
 
 # User controllable QEMU flags.
-QEMUFLAGS ?= -no-reboot -no-shutdown -m 4G
+QEMUFLAGS ?= -m 4G
+
+# QEMU allows commas in comma-separated argument lists if the commas are
+# duplicated. See QEMU_FLAGS and run_{hdd,iso} for usages.
+COMMA := ,
+QEMU_OUT_DIR = $(subst $(COMMA),$(COMMA)$(COMMA),$(OUT_DIR))
+
+# Adding tests if necessary. Specify using `make RUNTEST=<test_selection> ...`
+# Creates a new build variant to avoid inconsistent builds. Use the special
+# test selection "RUNTEST=all" to run all tests. Tests are written to the
+# test.out file in the output directory.
+ifneq ($(RUNTEST),)
+    ifeq ($(RUNTEST),all)
+        override CFLAGS += -DRUNTEST='' -DSERIAL
+    else
+        override CFLAGS += -DRUNTEST=$(RUNTEST) -DSERIAL
+    endif
+    override OUT_DIR := $(OUT_DIR).test_$(RUNTEST)
+
+    # tee-like functionality. See https://superuser.com/a/1412150
+    override QEMUFLAGS += -display none \
+        -chardev stdio,id=char0,logfile=$(QEMU_OUT_DIR)/test.out,signal=off \
+        -serial chardev:char0
+else ifneq ($(SERIAL),)
+    # This doesn't create a different variant. Should it?
+    override CFLAGS += -DSERIAL
+    override QEMUFLAGS += -serial stdio
+endif
+
+# Debug mode. Specify using `make DEBUG=1 ...`
+# Make sure to `make clean` if switching between debug and non-debug modes to
+# prevent an inconsistent build.
+# Also creates a new build variant.
+#
+# Use DEBUG=i for the `run_hdd`/`run_iso` targets if you want to run with
+# interactive debugging (`run_gdb`). Make sure to use the same variant flags
+# so that the correct image variant is targeted.
+ifneq ($(DEBUG),)
+    override CFLAGS += -DDEBUG -g -save-temps=obj
+    override NASMFLAGS += -DDEBUG -g
+    override OUT_DIR := $(OUT_DIR).debug
+    ifeq ($(DEBUG),i)
+        override QEMUFLAGS += -s -S -no-reboot -no-shutdown
+    endif
+endif
+
+# See final output directory. https://stackoverflow.com/a/16489377/2397327
+$(info $$OUT_DIR is [${OUT_DIR}])
 
 # Internal C flags that should not be changed by the user.
 override CFLAGS +=       \
@@ -101,11 +150,6 @@ $(KERNEL_OUT_DIR)/$(KERNEL): $(OBJ) $(KERNEL_OUT_DIR)
 # Alias for building the kernel.
 kernel: $(KERNEL_OUT_DIR)/$(KERNEL)
 	@ # Prevent the default cc rule from being run.
-
-# Adding debug flags to the kernel.
-kernel_debug: CFLAGS += -DDEBUG -g -save-temps=obj
-kernel_debug: NASMFLAGS += -DDEBUG -g
-kernel_debug: kernel
 
 # Include header dependencies.
 -include $(HEADER_DEPS)
@@ -187,11 +231,19 @@ $(OUT_DIR)/$(IMAGE_ISO): $(KERNEL_OUT_DIR)/$(KERNEL) limine
 
 .PHONY:
 run_hdd: $(OUT_DIR)/$(IMAGE_HDD)
-	qemu-system-x86_64 $(QEMUFLAGS) -drive file=$<,media=disk,format=raw
+	qemu-system-x86_64 $(QEMUFLAGS) \
+	    -drive file=$(QEMU_OUT_DIR)/$(IMAGE_HDD),media=disk,format=raw
 
 .PHONY:
 run_iso: $(OUT_DIR)/$(IMAGE_ISO)
-	qemu-system-x86_64 $(QEMUFLAGS) $<
+	qemu-system-x86_64 $(QEMUFLAGS) \
+	    -drive file=$(QEMU_OUT_DIR)/$(IMAGE_ISO),media=disk,format=raw
+
+# For debug builds with DEBUG=i. Make sure to run with the same variant args as
+# the build.
+.PHONY:
+run_gdb:
+	gdb -ex "target remote localhost:1234" -ex "file $(KERNEL_OUT_DIR)/$(KERNEL)"
 
 # Remove object files and the final executable.
 .PHONY: clean
