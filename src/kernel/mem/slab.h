@@ -2,9 +2,19 @@
  * Slab allocators for small physical memory allocations.
  *
  * Use a LIFO freelist for O(1) allocations/deallocations as described in
- * https://www.kernel.org/doc/gorman/html/understand/understand011.html. Another
- * possible implementation is to use a simple bitmap/buddy system allocator,
- * which uses less space but doesn't guarantee O(1) allocations.
+ * https://www.kernel.org/doc/gorman/html/understand/understand011.html. This
+ * requires an overhead of 2 bytes per object, plus the slab descriptor.
+ * Compared to the SLUB allocator (described below), this has a relatively high
+ * memory overhead; the benefit is that it does allow for caching initialized
+ * objects.
+ *
+ * An alternate (and possibly better overall) design is that of the Linux SLUB
+ * allocator, which instead stores slab metadata in the `struct page`, requires
+ * no overhead per element, and maintains O(1) allocations/frees. Free elements
+ * form a linked list (the freelist). However, this requires overwriting the
+ * objects themselves, which makes this method unsuitable for caching
+ * initialized objects. If implemented, much of the logic for the SLUB allocator
+ * can be shared with this slab allocator.
  *
  * A slab allocator allows for allocations of a power-of-2 order, from
  * 2^SLAB_MIN_ORDER to 2^SLAB_MAX_ORDER. A slab allocator (`struct slab_cache`)
@@ -42,9 +52,6 @@
  * The only true external interfaces here are `kmalloc()` and `kfree()`. The
  * rest of the `slab_cache_*()` and `slab_*()` methods are mainly exposed for
  * unit testing.
- *
- * TODO(jlam55555): This needs extensive unit testing. As well as everything
- * else in this kernel.
  */
 #ifndef MEM_SLAB_H
 #define MEM_SLAB_H
@@ -75,7 +82,14 @@ struct slab {
   uint8_t allocated; // 1
 
   // This must come last.
-  uint8_t freelist[0];
+  struct slab_freelist_item {
+    // freelist[i].stack_item gets the i-th index on the stack. Used for
+    // allocations.
+    uint8_t stack_item;
+    // freelist[i].pos_in_stk gets the index in the stack of the i-th object in
+    // the slab. Used for deallocations.
+    uint8_t pos_in_stk;
+  } freelist[0];
 } __attribute__((packed));
 
 /**

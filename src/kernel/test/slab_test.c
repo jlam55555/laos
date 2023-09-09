@@ -6,9 +6,6 @@
  * These tests depend on environmental factors, but shouldn't be a problem
  * unless we're OOM.
  *
- * TODO(jlam55555): May want to expose more of the slab mechanism as public
- * functions so that it is more easily testable.
- *
  * TODO(jlam55555): Define lifecycle tests for test initialization and cleanup.
  * Cleanup is more important, because initialization can happen anywhere in the
  * test.

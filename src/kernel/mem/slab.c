@@ -88,9 +88,11 @@ void slab_cache_init(struct slab_cache *slab_cache, struct phys_rra *rra,
   __attribute__((unused)) size_t wasted;
   if (_slab_cache_is_small(order)) {
     slab_cache->pages = 1;
-    slab_cache->elements = (PG_SZ - sizeof(struct slab)) / (element_size + 1);
+    slab_cache->elements = (PG_SZ - sizeof(struct slab)) /
+                           (element_size + sizeof(struct slab_freelist_item));
 
-    desc_size = sizeof(struct slab) + slab_cache->elements;
+    desc_size = sizeof(struct slab) +
+                slab_cache->elements * sizeof(struct slab_freelist_item);
     wasted = PG_SZ - (desc_size + slab_cache->elements * element_size);
   } else {
     slab_cache->pages = order >= PG_SZ_BITS ? PG_COUNT(1u << order) : 1;
@@ -98,7 +100,8 @@ void slab_cache_init(struct slab_cache *slab_cache, struct phys_rra *rra,
 
     // Descriptor + freelist must fit in the descriptor of a lower-level
     // freelist.
-    desc_size = sizeof(struct slab) + slab_cache->elements;
+    desc_size = sizeof(struct slab) +
+                slab_cache->elements * sizeof(struct slab_freelist_item);
     assert(desc_size <= (1u << (order - 1)));
 
     wasted = _round_up_pow2(desc_size) - desc_size;
@@ -127,7 +130,9 @@ void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   }
   void *const page_hm = VM_TO_HHDM(page);
 
-  const size_t desc_sz = sizeof(struct slab) + slab_cache->elements;
+  const size_t desc_sz =
+      sizeof(struct slab) +
+      slab_cache->elements * sizeof(struct slab_freelist_item);
   const size_t element_sz = 1u << slab_cache->order;
   struct slab *slab;
   void *objects_start;
@@ -157,7 +162,8 @@ void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
 
   // Initialize freelist.
   for (uint8_t i = 0; i < slab_cache->elements; ++i) {
-    slab->freelist[i] = i;
+    slab->freelist[i].stack_item = i;
+    slab->freelist[i].pos_in_stk = i;
   }
 
   // Set reference to slab_cache in struct page.
@@ -189,7 +195,8 @@ void *slab_alloc(struct slab *slab) {
   assert(slab->allocated < slab->parent->elements);
 
   const size_t order_sz = 1u << slab->parent->order;
-  void *const obj = slab->data + slab->freelist[slab->allocated] * order_sz;
+  void *const obj =
+      slab->data + slab->freelist[slab->allocated].stack_item * order_sz;
   ++slab->allocated;
   return obj;
 }
@@ -245,24 +252,27 @@ void slab_free(struct slab *slab, const void *obj) {
 
   // Find index of the allocated element in the freelist.
   const uint8_t index = off >> order;
-  uint8_t i;
-  for (i = 0; i < slab->parent->elements && slab->freelist[i] != index; ++i) {
-  }
-  assert(i < slab->parent->elements);
+  assert(index < slab->parent->elements);
+  const uint8_t i = slab->freelist[index].pos_in_stk;
 
-  // Free the element 1. Beforehand:
+  // Free the element 0. Beforehand:
   //
   //          used   |  free
-  //     | 1 | 3 | 4 | 5 | 2 |
+  //     | 0 | 2 | 3 | 4 | 1 | stack_item
+  //     | 0 | 4 | 1 | 2 | 3 | pos_in_stk
   //
   //       used  |   free
-  //     | 4 | 3 | 1 | 5 | 2 |
+  //     | 3 | 2 | 0 | 4 | 1 | stack_item
+  //     | 2 | 4 | 1 | 0 | 3 | pos_in_stk
   //
-  // Afterwards. Note that 1 (the element to be freed) and 4 (the last used
+  // Afterwards. Note that 0 (the element to be freed) and 3 (the last used
   // element) swap places.
   --slab->allocated;
-  slab->freelist[i] = slab->freelist[slab->allocated];
-  slab->freelist[slab->allocated] = index;
+  slab->freelist[i].stack_item = slab->freelist[slab->allocated].stack_item;
+  slab->freelist[slab->allocated].stack_item = index;
+
+  slab->freelist[i].pos_in_stk = slab->allocated;
+  slab->freelist[slab->freelist[i].stack_item].pos_in_stk = i;
 }
 
 void slab_cache_free(struct slab *slab, const void *obj) {
