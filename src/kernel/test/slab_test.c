@@ -1,7 +1,5 @@
 /**
- * These tests are for `kmalloc()` only, and don't require setting up a custom
- * allocator. Unit tests for internal functions, and tests that set up a custom
- * slab cache should go directly in mem/slab.c.
+ * Tests for the slab allocator (including `kmalloc()`/`kfree()`).
  *
  * These tests depend on environmental factors, but shouldn't be a problem
  * unless we're OOM.
@@ -114,6 +112,7 @@ DEFINE_TEST(slab, kmalloc_last_freed_realloc) {
 // TODO(jlam55555): Internal unit tests to make sure that slab bookkeeping is
 // correct.
 // TODO(jlam55555): Add unit tests for _slab_allocator_init,
+// TODO(jlam55555): Test that an initialized object will stay initialized.
 // _slab_allocator_get_cache, _slab_cache_alloc_slab,
 // _slab_cache_find_nonfull_slab, _slab_move_to_ll, _slab_cache_alloc,
 // _slab_free, _slab_cache_free

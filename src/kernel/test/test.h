@@ -91,10 +91,13 @@ struct test_info {
 #define DEFINE_TEST(ns, test) _define_test(ns##__##test, #ns "." #test)
 
 /**
- * Run all tests, or run tests with the given name.
- *
- * TODO(jlam55555): Determine how to specify tests.
+ * Run all tests, or run tests that match the selection pattern.
  */
 void run_tests(const char *selection);
+
+/**
+ * Test pattern matcher.
+ */
+bool test_matches(const struct test_info *test, const char *selection);
 
 #endif // TEST_TEST_H
