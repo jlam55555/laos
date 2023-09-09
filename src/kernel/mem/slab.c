@@ -68,10 +68,12 @@ void _slab_allocator_init(unsigned order, struct slab_cache *slab_cache) {
     wasted = _round_up_pow2(desc_size) - desc_size;
   }
 
+#ifdef DEBUG
   printf("slaballoc: order=%u pages=%u elements=%u small=%u desc_size=%lu "
          "wasted=%lu\r\n",
          slab_cache->order, slab_cache->pages, slab_cache->elements,
          _slab_cache_is_small(order), desc_size, wasted);
+#endif // DEBUG
 }
 
 struct slab_cache *_slab_allocator_get_cache(unsigned order) {
@@ -92,7 +94,7 @@ void _slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   if (!page) {
     return;
   }
-  void *page_hm = (void *)((size_t)page | VM_HM_START);
+  void *page_hm = VM_TO_HHDM(page);
 
   size_t desc_sz = sizeof(struct slab) + slab_cache->elements;
   size_t element_sz = 1u << slab_cache->order;
@@ -115,7 +117,7 @@ void _slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   }
 
   // Initialize slab ll.
-  slab->next = NULL;
+  slab->prev = NULL;
   slab->next = NULL;
   slab->data = objects_start;
 
@@ -155,7 +157,8 @@ void *_slab_alloc(struct slab *slab) {
   assert(slab);
   assert(slab->allocated < slab->parent->elements);
 
-  void *obj = slab->data + slab->freelist[slab->allocated];
+  size_t order_sz = 1u << slab->parent->order;
+  void *obj = slab->data + slab->freelist[slab->allocated] * order_sz;
   ++slab->allocated;
   return obj;
 }
@@ -290,9 +293,7 @@ void _slab_cache_free(struct slab *slab, void *obj) {
 }
 
 void kfree(void *obj) {
-  // TODO(jlam55555): Should write a function to do kernel <-> phys addr
-  // conversions.
-  struct page *pg = phys_get_page((void *)((size_t)obj & ~VM_HM_START));
+  struct page *pg = phys_get_page(obj);
   assert(pg);
 
   struct slab *slab = pg->context.slab;

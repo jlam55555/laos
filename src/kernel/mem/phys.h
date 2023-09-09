@@ -13,6 +13,9 @@
  * this may change in the future. E.g., refcounts/the number of free entries in
  * a PML* table may be helpful for freeing physical pages.
  *
+ * External APIs take as argument and return HHDM virtual addresses. Internal
+ * APIs take as argument and return physical (direct-mapped) addresses.
+ *
  * N.B. Assuming `sizeof(struct page) == 64` like it is in Linux, we will start
  * running into problems with this allocator and the stock Linux
  * bootloader/protocol once the size of the `struct page` array exceeds the HHDM
@@ -111,8 +114,7 @@ void phys_reclaim_bootloader_mem(struct limine_memmap_entry *init_mmap,
 /**
  * Allocate a single physical page using a round-robin allocator.
  *
- * Returns the physical address of the new page, or NULL if physical pages are
- * exhausted.
+ * Returns the address of the new page, or NULL if physical pages are exhausted.
  */
 void *phys_page_alloc(void);
 
@@ -122,7 +124,7 @@ void *phys_page_alloc(void);
 void phys_page_free(void *pg);
 
 /**
- * Allocate multiple contiguous pages. Simple but inefficient.
+ * Allocate multiple contiguous pages. Simple but inefficient for order > 0.
  */
 void *phys_page_alloc_order(unsigned order);
 

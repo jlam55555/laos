@@ -53,7 +53,6 @@ static struct _phys_rr_allocator {
  */
 static bool _phys_page_alloc(void *addr) {
   addr = VM_TO_DIRECT(addr);
-  assert(PG_ALIGNED(addr));
   size_t pg = (size_t)addr >> PG_SZ_BITS;
   assert(pg < _phys_allocator.total_pg);
   assert(!_phys_allocator.mem_bitmap[pg].unusable);
@@ -164,7 +163,8 @@ static void _phys_rr_allocator_init(void *addr, size_t mem_limit,
 
   // Mark bitmap pages as allocated. We use the physical address here rather
   // than the HHDM address.
-  _phys_region_alloc(_phys_allocator.mem_bitmap, PG_COUNT(bm_sz), false);
+  _phys_region_alloc(VM_TO_DIRECT(_phys_allocator.mem_bitmap), PG_COUNT(bm_sz),
+                     false);
 
   // Mark unusable regions in the bitmap.
   void *prev_end = NULL;
@@ -173,7 +173,7 @@ static void _phys_rr_allocator_init(void *addr, size_t mem_limit,
 
     // Memory hole detected. Mark it as unusable memory.
     if ((size_t)prev_end != mmap_entry->base) {
-      _phys_region_alloc(prev_end,
+      _phys_region_alloc(VM_TO_DIRECT(prev_end),
                          PG_COUNT((void *)mmap_entry->base - prev_end), true);
     }
     prev_end = (void *)(mmap_entry->base + mmap_entry->length);
@@ -181,8 +181,8 @@ static void _phys_rr_allocator_init(void *addr, size_t mem_limit,
     // Mark unusable memory regions. (This includes bootloader-reclaimable
     // memory regions, which will be freed/marked usable later on.)
     if (mmap_entry->type != LIMINE_MEMMAP_USABLE) {
-      _phys_region_alloc((void *)mmap_entry->base, PG_COUNT(mmap_entry->length),
-                         true);
+      _phys_region_alloc(VM_TO_DIRECT(mmap_entry->base),
+                         PG_COUNT(mmap_entry->length), true);
     }
   }
 }
@@ -269,49 +269,62 @@ void phys_reclaim_bootloader_mem(struct limine_memmap_entry *init_mmap,
 /**
  * Round-robin page allocator.
  */
-void *phys_page_alloc(void) {
+void *phys_page_alloc(void) { return phys_page_alloc_order(0); }
+
+void phys_page_free(void *pg) { assert(_phys_page_free(VM_TO_DIRECT(pg))); }
+
+bool _phys_can_alloc_order_at(struct _phys_rr_allocator *allocator,
+                              size_t order) {
+  size_t pages = 1u << order;
+
+  // Not enough contiguous pages left after the needle.
+  if (allocator->needle + pages > allocator->total_pg) {
+    return false;
+  }
+
+  struct page *entry = allocator->mem_bitmap + allocator->needle;
+  for (size_t i = 0; i < pages; ++i, ++entry) {
+    if (entry->present || entry->unusable) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void *phys_page_alloc_order(unsigned order) {
   if (_phys_allocator.allocated_pg == _phys_allocator.total_pg) {
     // OOM
     return NULL;
   }
 
   size_t start_needle = _phys_allocator.needle;
-  while (_phys_allocator.mem_bitmap[_phys_allocator.needle].present ||
-         _phys_allocator.mem_bitmap[_phys_allocator.needle].unusable) {
-    if (++_phys_allocator.needle >= _phys_allocator.total_sz) {
-      _phys_allocator.needle -= _phys_allocator.total_sz;
+  size_t pages = 1u << order;
+  while (!_phys_can_alloc_order_at(&_phys_allocator, order)) {
+    if (++_phys_allocator.needle >= _phys_allocator.total_pg) {
+      _phys_allocator.needle -= _phys_allocator.total_pg;
     }
 
-    // Sanity check. If this assertion fails, that means we're OOM, but the
-    // original OOM check didn't catch this.
-    assert(_phys_allocator.needle != start_needle);
+    // Could not allocate at this size.
+    if (_phys_allocator.needle == start_needle) {
+      return NULL;
+    }
   }
 
-  // We could move the needle here so that it points to the next page, or leave
-  // it pointing at the last allocated page. The latter option may be useful if
-  // pages are used in a LIFO manner.
   void *phys_addr = (void *)((size_t)_phys_allocator.needle << PG_SZ_BITS);
-  assert(_phys_page_alloc(phys_addr));
+  _phys_region_alloc(phys_addr, pages, false);
 
-  // Return HHDM address.
   return VM_TO_HHDM(phys_addr);
 }
 
-void phys_page_free(void *pg) { assert(_phys_page_free(pg)); }
-
-void *phys_page_alloc_order(unsigned order) {
-  // TODO(jlam55555): Working here.
-  return NULL;
-}
-
 void phys_page_free_order(void *pg, unsigned order) {
-  // TODO(jlam55555): Working here.
-  assert(false);
+  size_t pages = 1u << order;
+  for (unsigned i = 0; i < pages; ++i, pg += PG_SZ) {
+    assert(_phys_page_free(VM_TO_DIRECT(pg)));
+  }
 }
 
 struct page *phys_get_page(void *pg) {
-  // TODO(jlam55555): Do assertions on pg here.
-  return &_phys_allocator.mem_bitmap[(size_t)pg >> PG_SZ_BITS];
+  return &_phys_allocator.mem_bitmap[(size_t)VM_TO_DIRECT(pg) >> PG_SZ_BITS];
 }
 
 void phys_mem_print_stats(void) {
