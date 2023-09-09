@@ -15,6 +15,9 @@ static bool _slab_cache_is_small(unsigned order) {
   return order <= SLAB_SMALL_MAX_ORDER;
 }
 
+/**
+ * Helper function to get the main slab cache of the given order.
+ */
 static struct slab_cache *_slab_allocator_get_cache(unsigned order) {
   if (order < SLAB_MIN_ORDER || order > SLAB_MAX_ORDER) {
     return NULL;
@@ -72,11 +75,13 @@ static unsigned _round_up_pow2(unsigned v) {
   return v;
 }
 
-void slab_cache_init(struct slab_cache *slab_cache, unsigned order) {
+void slab_cache_init(struct slab_cache *slab_cache, struct phys_rra *rra,
+                     unsigned order) {
   slab_cache->order = order;
   slab_cache->empty_slabs = NULL;
   slab_cache->partial_slabs = NULL;
   slab_cache->full_slabs = NULL;
+  slab_cache->allocator = rra;
 
   const size_t element_size = 1u << order;
   size_t desc_size;
@@ -109,14 +114,14 @@ void slab_cache_init(struct slab_cache *slab_cache, unsigned order) {
 
 void slab_allocators_init(void) {
   for (unsigned order = SLAB_MIN_ORDER; order <= SLAB_MAX_ORDER; ++order) {
-    slab_cache_init(_slab_allocator_get_cache(order), order);
+    slab_cache_init(_slab_allocator_get_cache(order), phys_mem_get_rra(),
+                    order);
   }
 }
 
 void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
-  struct phys_rra *rra = phys_mem_get_rra();
-
-  void *const page = phys_rra_alloc_order(rra, slab_cache->order);
+  void *const page =
+      phys_rra_alloc_order(slab_cache->allocator, slab_cache->order);
   if (!page) {
     return;
   }
@@ -138,7 +143,7 @@ void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   }
 
   if (!slab) {
-    phys_rra_free_order(rra, page, slab_cache->order);
+    phys_rra_free_order(slab_cache->allocator, page, slab_cache->order);
     return;
   }
 
@@ -156,7 +161,7 @@ void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   }
 
   // Set reference to slab_cache in struct page.
-  struct page *const pg_desc = phys_rra_get_page(rra, page);
+  struct page *const pg_desc = phys_rra_get_page(slab_cache->allocator, page);
   assert(pg_desc);
   pg_desc->context.slab = slab;
 

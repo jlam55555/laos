@@ -52,6 +52,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "mem/phys.h" // struct phys_rra
+
 #define SLAB_MIN_ORDER 4
 #define SLAB_MAX_ORDER 16
 #define SLAB_SMALL_MAX_ORDER 7
@@ -93,6 +95,9 @@ struct slab_cache {
   struct slab *empty_slabs;   // 8
   struct slab *partial_slabs; // 8
   struct slab *full_slabs;    // 8
+
+  // Physical page allocator.
+  struct phys_rra *allocator; // 8
 };
 
 /**
@@ -137,7 +142,8 @@ void kfree(const void *obj);
  * of "wasted bytes" might be the ratio of allocatable bytes to the total
  * backing store size for one slab.)
  */
-void slab_cache_init(struct slab_cache *slab_cache, unsigned order);
+void slab_cache_init(struct slab_cache *slab_cache, struct phys_rra *rra,
+                     unsigned order);
 
 /**
  * Allocate a new slab for the provided slab cache, and add the new slab to the
