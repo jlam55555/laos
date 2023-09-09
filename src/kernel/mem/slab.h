@@ -39,6 +39,10 @@
  * When freeing an object, the slab that the object belongs to is noted by the
  * `struct page` for the physical page of the object memory.
  *
+ * The only true external interfaces here are `kmalloc()` and `kfree()`. The
+ * rest of the `slab_cache_*()` and `slab_*()` methods are mainly exposed for
+ * unit testing.
+ *
  * TODO(jlam55555): This needs extensive unit testing. As well as everything
  * else in this kernel.
  */
@@ -113,5 +117,67 @@ void *kmalloc(size_t sz);
  * allocator.
  */
 void kfree(const void *obj);
+
+/**
+ * Initialize a `struct slab_cache`, including dynamically determining how many
+ * elements should be in this slab_cache.
+ *
+ * Requirements for number of elements per slab of size S (usually S == PG_SZ,
+ * but S must be larger if 2^M > PG_SZ):
+ * - For small object slabs of order M:
+ *   - sizeof(struct slab) + N + N*2^M <= S.
+ *   - Note that the objects need to be 2^M aligned as well.
+ * - For large object slabs of order M:
+ *   - N*2^M <= S
+ *   - sizeof(struct slab) + N <= 2^(M-1). (This means that the descriptor size
+ *     can use a lower-order slab allocator.)
+ *
+ * In general, the goal is to minimize wasted space overhead. The number of
+ * wasted bytes is computed by _slab_allocator_init. (Perhaps a better measure
+ * of "wasted bytes" might be the ratio of allocatable bytes to the total
+ * backing store size for one slab.)
+ */
+void slab_cache_init(struct slab_cache *slab_cache, unsigned order);
+
+/**
+ * Allocate a new slab for the provided slab cache, and add the new slab to the
+ * slab cache's empty list.
+ */
+void slab_cache_alloc_slab(struct slab_cache *slab_cache);
+
+/**
+ * Find a non-full slab in a slab cache. First check the empty list, then the
+ * partially-full list. If no slabs exist, then allocate a new slab.
+ */
+struct slab *slab_cache_find_nonfull_slab(struct slab_cache *slab_cache);
+
+/**
+ * Allocate an object within a slab. O(1) runtime, and returns the last-freed
+ * element (if any).
+ */
+void *slab_alloc(struct slab *slab);
+
+/**
+ * Allocate an object within a slab cache. O(1) runtime.
+ */
+void *slab_cache_alloc(struct slab_cache *slab_cache);
+
+/**
+ * Frees the object within the slab.
+ *
+ * Currently doesn't perform any bounds checking. This shouldn't be called
+ * directly except from `slab_cache_free()` and in unit tests.
+ */
+void slab_free(struct slab *slab, const void *obj);
+
+/**
+ * Frees the object from the parent slab cache.
+ *
+ * This function may be a little confusingly-named, because it appears to have
+ * the same argument set as the `slab_free()` function above. This is just a
+ * wrapper around it which does some handling on the parent `struct slab_cache`
+ * -- there's no reason it can't be combined with that function.
+ */
+void slab_cache_free(struct slab *slab, const void *obj);
 
 #endif // MEM_SLAB_H

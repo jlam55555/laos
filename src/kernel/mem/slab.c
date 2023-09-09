@@ -6,10 +6,55 @@
 
 #include <assert.h>
 
+/**
+ * Main slab caches.
+ */
 struct slab_cache _slab_caches[SLAB_MAX_ORDER - SLAB_MIN_ORDER + 1];
 
 static bool _slab_cache_is_small(unsigned order) {
   return order <= SLAB_SMALL_MAX_ORDER;
+}
+
+static struct slab_cache *_slab_allocator_get_cache(unsigned order) {
+  if (order < SLAB_MIN_ORDER || order > SLAB_MAX_ORDER) {
+    return NULL;
+  }
+  return &_slab_caches[order - SLAB_MIN_ORDER];
+}
+
+/**
+ * This function has a bit of a funny signature (which indicates that I should
+ * really implement standardized LL macros.
+ *
+ * Usage: if you want to move slab from (its existing linked list) to
+ * slab_cache->xyz_slabs, then call this like so:
+ *
+ *    slab_cache->xyz_slabs = _slab_move_to_ll(slab, slab_cache->xyz_slabs);
+ *
+ * The return value is for convenience. Alternatively, you can do:
+ *
+ *    _slab_move_to_ll(slab, slab_cache->xyz_slabs);
+ *    slab_cache->xyz_slabs = slab;
+ *
+ * Maybe this should be a macro, and maybe I should add a sentinel node to the
+ * slab LLs. It's not too big of a deal now but it might be when more LLs get
+ * introduced.
+ */
+static struct slab *_slab_move_to_ll(struct slab *slab, struct slab *ll) {
+  // Remove from current linked list.
+  if (slab->prev) {
+    slab->prev->next = slab->next;
+  }
+  if (slab->next) {
+    slab->next->prev = slab->prev;
+  }
+
+  // Prepend to the new linked list.
+  slab->prev = NULL;
+  slab->next = ll;
+
+  // For convenience; see comment above function.
+  return slab;
 }
 
 /**
@@ -27,23 +72,7 @@ static unsigned _round_up_pow2(unsigned v) {
   return v;
 }
 
-/**
- * Requirements for number of elements per slab of size S (usually S == PG_SZ,
- * but S must be larger if 2^M > PG_SZ):
- * - For small object slabs of order M:
- *   - sizeof(struct slab) + N + N*2^M <= S.
- *   - Note that the objects need to be 2^M aligned as well.
- * - For large object slabs of order M:
- *   - N*2^M <= S
- *   - sizeof(struct slab) + N <= 2^(M-1). (This means that the descriptor size
- *     can use a lower-order slab allocator.)
- *
- * In general, the goal is to minimize wasted space overhead. The number of
- * wasted bytes is computed by _slab_allocator_init. (Perhaps a better measure
- * of "wasted bytes" might be the ratio of allocatable bytes to the total
- * backing store size for one slab.)
- */
-void _slab_allocator_init(unsigned order, struct slab_cache *slab_cache) {
+void slab_cache_init(struct slab_cache *slab_cache, unsigned order) {
   slab_cache->order = order;
   slab_cache->empty_slabs = NULL;
   slab_cache->partial_slabs = NULL;
@@ -78,20 +107,13 @@ void _slab_allocator_init(unsigned order, struct slab_cache *slab_cache) {
 #endif // DEBUG
 }
 
-struct slab_cache *_slab_allocator_get_cache(unsigned order) {
-  if (order < SLAB_MIN_ORDER || order > SLAB_MAX_ORDER) {
-    return NULL;
-  }
-  return &_slab_caches[order - SLAB_MIN_ORDER];
-}
-
 void slab_allocators_init(void) {
   for (unsigned order = SLAB_MIN_ORDER; order <= SLAB_MAX_ORDER; ++order) {
-    _slab_allocator_init(order, _slab_allocator_get_cache(order));
+    slab_cache_init(_slab_allocator_get_cache(order), order);
   }
 }
 
-void _slab_cache_alloc_slab(struct slab_cache *slab_cache) {
+void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   struct phys_rra *rra = phys_mem_get_rra();
 
   void *const page = phys_rra_alloc_order(rra, slab_cache->order);
@@ -141,7 +163,7 @@ void _slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   slab_cache->empty_slabs = slab;
 }
 
-struct slab *_slab_cache_find_nonfull_slab(struct slab_cache *slab_cache) {
+struct slab *slab_cache_find_nonfull_slab(struct slab_cache *slab_cache) {
   // Look for partially-full slabs first.
   if (slab_cache->partial_slabs) {
     return slab_cache->partial_slabs;
@@ -153,11 +175,11 @@ struct slab *_slab_cache_find_nonfull_slab(struct slab_cache *slab_cache) {
   }
 
   // Need to allocate a new slab.
-  _slab_cache_alloc_slab(slab_cache);
+  slab_cache_alloc_slab(slab_cache);
   return slab_cache->empty_slabs;
 }
 
-void *_slab_alloc(struct slab *slab) {
+void *slab_alloc(struct slab *slab) {
   assert(slab);
   assert(slab->allocated < slab->parent->elements);
 
@@ -167,43 +189,8 @@ void *_slab_alloc(struct slab *slab) {
   return obj;
 }
 
-/**
- * This function has a bit of a funny signature (which indicates that I should
- * really implement standardized LL macros.
- *
- * Usage: if you want to move slab from (its existing linked list) to
- * slab_cache->xyz_slabs, then call this like so:
- *
- *    slab_cache->xyz_slabs = _slab_move_to_ll(slab, slab_cache->xyz_slabs);
- *
- * The return value is for convenience. Alternatively, you can do:
- *
- *    _slab_move_to_ll(slab, slab_cache->xyz_slabs);
- *    slab_cache->xyz_slabs = slab;
- *
- * Maybe this should be a macro, and maybe I should add a sentinel node to the
- * slab LLs. It's not too big of a deal now but it might be when more LLs get
- * introduced.
- */
-struct slab *_slab_move_to_ll(struct slab *slab, struct slab *ll) {
-  // Remove from current linked list.
-  if (slab->prev) {
-    slab->prev->next = slab->next;
-  }
-  if (slab->next) {
-    slab->next->prev = slab->prev;
-  }
-
-  // Prepend to the new linked list.
-  slab->prev = NULL;
-  slab->next = ll;
-
-  // For convenience; see comment above function.
-  return slab;
-}
-
-static void *_slab_cache_alloc(struct slab_cache *slab_cache) {
-  struct slab *const slab = _slab_cache_find_nonfull_slab(slab_cache);
+void *slab_cache_alloc(struct slab_cache *slab_cache) {
+  struct slab *const slab = slab_cache_find_nonfull_slab(slab_cache);
   if (!slab) {
     return NULL;
   }
@@ -211,7 +198,7 @@ static void *_slab_cache_alloc(struct slab_cache *slab_cache) {
   bool is_slab_orig_empty = !!slab->allocated;
 
   // Perform allocation.
-  void *obj = _slab_alloc(slab);
+  void *obj = slab_alloc(slab);
 
   if (slab->allocated == slab->parent->elements) {
     // Move to full list.
@@ -240,10 +227,10 @@ void *kmalloc(size_t sz) {
   if (!slab_cache) {
     return NULL;
   }
-  return _slab_cache_alloc(slab_cache);
+  return slab_cache_alloc(slab_cache);
 }
 
-void _slab_free(struct slab *slab, const void *obj) {
+void slab_free(struct slab *slab, const void *obj) {
   // Find the position of the object in the freelist.
   const size_t off = obj - slab->data;
   const unsigned order = slab->parent->order;
@@ -273,19 +260,13 @@ void _slab_free(struct slab *slab, const void *obj) {
   slab->freelist[slab->allocated] = index;
 }
 
-/**
- * This function may be a little confusingly-named, because it appears to have
- * the same argument set as the `_slab_free()` function above. This is just a
- * wrapper around it which does some handling on the parent `struct slab_cache`
- * -- there's no reason it can't be combined with that function.
- */
-void _slab_cache_free(struct slab *slab, const void *obj) {
+void slab_cache_free(struct slab *slab, const void *obj) {
   struct slab_cache *const slab_cache = slab->parent;
 
   bool is_slab_orig_full = slab->allocated == slab->parent->elements;
 
   // Perform freeing.
-  _slab_free(slab, obj);
+  slab_free(slab, obj);
 
   if (!slab->allocated) {
     // Move to empty list.
@@ -304,5 +285,5 @@ void kfree(const void *obj) {
   struct slab *const slab = pg->context.slab;
   assert(slab);
 
-  _slab_cache_free(slab, obj);
+  slab_cache_free(slab, obj);
 }
