@@ -112,6 +112,6 @@ void *kmalloc(size_t sz);
  * Free a memory region allocated with `kmalloc()` or directly from a slab
  * allocator.
  */
-void kfree(void *obj);
+void kfree(const void *obj);
 
 #endif // MEM_SLAB_H

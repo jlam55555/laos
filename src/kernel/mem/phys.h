@@ -13,8 +13,14 @@
  * this may change in the future. E.g., refcounts/the number of free entries in
  * a PML* table may be helpful for freeing physical pages.
  *
- * External APIs take as argument and return HHDM virtual addresses. Internal
- * APIs take as argument and return physical (direct-mapped) addresses.
+ * `phys_rra_*()` methods are the lower-level interface for the round-robin page
+ * allocator, and are mostly exposed for unit testing. The RRA interface expects
+ * its arguments to be physical (identity-mapped) addresses, and will return
+ * physical addresses.
+ *
+ * The non-RRA methods form a wrapper around the RRA methods. These interact
+ * with the main memory allocator and expect/return HHDM addresses. These should
+ * be used for most normal operation.
  *
  * N.B. Assuming `sizeof(struct page) == 64` like it is in Linux, we will start
  * running into problems with this allocator and the stock Linux
@@ -98,6 +104,43 @@ struct page {
 } __attribute__((packed));
 
 /**
+ * Physical memory round-robin (page) allocator (RRA).
+ */
+struct phys_rra {
+  /**
+   * Store information about each `struct page`.
+   *
+   * Will be a HM address, since the new PT won't include a LM identity map.
+   *
+   * N.B. This was previously a bitmap that only stored whether each physical
+   * page was allocated, but now we want to store more more info per page.
+   */
+  struct page *mem_bitmap;
+
+  /**
+   * Physical memory statistics. total_sz == total_pg * PG_SZ, included for
+   * convenience. Total size is the end of the physical address space.
+   *
+   * Note that unusable_pg is counted in the total_pg but not the allocated_pg.
+   * That is, total_pg = allocated_pg + unusable_pg + <free pg>. This definition
+   * may change in the future if a more convenient definition arises.
+   *
+   * Note also that unusable_pg includes bootloader reclaimable memory before it
+   * has been freed. This choice is somewhat arbitrary -- these pages could
+   * alternatively have been marked as allocated to prevent their use.
+   */
+  size_t total_sz;
+  size_t total_pg;
+  size_t allocated_pg;
+  size_t unusable_pg;
+
+  /**
+   * Round-robin scheduling.
+   */
+  size_t needle;
+};
+
+/**
  * Initialize physical memory map using Limine memmap feature (which is itself
  * based on the BIOS E820 function).
  */
@@ -116,22 +159,12 @@ void phys_reclaim_bootloader_mem(struct limine_memmap_entry *init_mmap,
  *
  * Returns the address of the new page, or NULL if physical pages are exhausted.
  */
-void *phys_page_alloc(void);
+void *phys_alloc_page(void);
 
 /**
  * Free a single physical page.
  */
-void phys_page_free(void *pg);
-
-/**
- * Allocate multiple contiguous pages. Simple but inefficient for order > 0.
- */
-void *phys_page_alloc_order(unsigned order);
-
-/**
- * Free multiple contiguous pages.
- */
-void phys_page_free_order(void *pg, unsigned order);
+void phys_free_page(const void *pg);
 
 /**
  * Print statistics about physical memory (e.g., available, reserved, usable,
@@ -140,10 +173,45 @@ void phys_page_free_order(void *pg, unsigned order);
 void phys_mem_print_stats(void);
 
 /**
- * Get `struct page` for a physical address. This currently doesn't do any
- * checks on the input address, but the return value should be checked in case
- * checks are added in the future.
+ * Gets a reference to the main RRA. For advanced cases (e.g., used in the slab
+ * allocator) and unit testing.
  */
-struct page *phys_get_page(void *pg);
+struct phys_rra *phys_mem_get_rra(void);
+
+/**
+ * Allocates a physical page. Errors if the page is unusable (e.g., hole
+ * memory). Returns true iff the physical page is free.
+ */
+bool phys_rra_alloc(struct phys_rra *, const void *pg);
+
+/**
+ * Frees a physical page. Errors if the page is unusable (e.g., hole memory).
+ * Returns true iff the physical page is allocated.
+ */
+bool phys_rra_free(struct phys_rra *, const void *pg);
+
+/**
+ * Initializes a RRA. Initializes the `struct page` array using the provided
+ * `init_mmap`.
+ *
+ * Addresses in `init_mmap` are allowed to be in the HHDM, for convenience.
+ */
+void phys_rra_init(struct phys_rra *, void *addr, size_t mem_limit,
+                   struct limine_memmap_entry *init_mmap, size_t entry_count);
+
+/**
+ * Allocates/frees a continuous region of 2^order pages. Returns NULL if no such
+ * region is found.
+ *
+ * Is not designed to be efficient for order > 0, although this can be improved
+ * with a buddy allocator system.
+ */
+void *phys_rra_alloc_order(struct phys_rra *, unsigned order);
+void phys_rra_free_order(struct phys_rra *, const void *pg, unsigned order);
+
+/**
+ * Returns the `struct page` associated with a page.
+ */
+struct page *phys_rra_get_page(struct phys_rra *rra, const void *pg);
 
 #endif // MEM_PHYS_H

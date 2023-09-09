@@ -49,7 +49,9 @@ void _slab_allocator_init(unsigned order, struct slab_cache *slab_cache) {
   slab_cache->partial_slabs = NULL;
   slab_cache->full_slabs = NULL;
 
-  size_t element_size = 1u << order, wasted, desc_size;
+  const size_t element_size = 1u << order;
+  size_t desc_size;
+  __attribute__((unused)) size_t wasted;
   if (_slab_cache_is_small(order)) {
     slab_cache->pages = 1;
     slab_cache->elements = (PG_SZ - sizeof(struct slab)) / (element_size + 1);
@@ -90,14 +92,16 @@ void slab_allocators_init(void) {
 }
 
 void _slab_cache_alloc_slab(struct slab_cache *slab_cache) {
-  void *page = phys_page_alloc_order(slab_cache->order);
+  struct phys_rra *rra = phys_mem_get_rra();
+
+  void *const page = phys_rra_alloc_order(rra, slab_cache->order);
   if (!page) {
     return;
   }
-  void *page_hm = VM_TO_HHDM(page);
+  void *const page_hm = VM_TO_HHDM(page);
 
-  size_t desc_sz = sizeof(struct slab) + slab_cache->elements;
-  size_t element_sz = 1u << slab_cache->order;
+  const size_t desc_sz = sizeof(struct slab) + slab_cache->elements;
+  const size_t element_sz = 1u << slab_cache->order;
   struct slab *slab;
   void *objects_start;
   if (_slab_cache_is_small(slab_cache->order)) {
@@ -112,7 +116,7 @@ void _slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   }
 
   if (!slab) {
-    phys_page_free_order(page, slab_cache->order);
+    phys_rra_free_order(rra, page, slab_cache->order);
     return;
   }
 
@@ -130,7 +134,7 @@ void _slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   }
 
   // Set reference to slab_cache in struct page.
-  struct page *pg_desc = phys_get_page(page);
+  struct page *const pg_desc = phys_rra_get_page(rra, page);
   assert(pg_desc);
   pg_desc->context.slab = slab;
 
@@ -157,8 +161,8 @@ void *_slab_alloc(struct slab *slab) {
   assert(slab);
   assert(slab->allocated < slab->parent->elements);
 
-  size_t order_sz = 1u << slab->parent->order;
-  void *obj = slab->data + slab->freelist[slab->allocated] * order_sz;
+  const size_t order_sz = 1u << slab->parent->order;
+  void *const obj = slab->data + slab->freelist[slab->allocated] * order_sz;
   ++slab->allocated;
   return obj;
 }
@@ -199,7 +203,7 @@ struct slab *_slab_move_to_ll(struct slab *slab, struct slab *ll) {
 }
 
 static void *_slab_cache_alloc(struct slab_cache *slab_cache) {
-  struct slab *slab = _slab_cache_find_nonfull_slab(slab_cache);
+  struct slab *const slab = _slab_cache_find_nonfull_slab(slab_cache);
   if (!slab) {
     return NULL;
   }
@@ -232,23 +236,24 @@ void *kmalloc(size_t sz) {
   if (order < SLAB_MIN_ORDER) {
     order = SLAB_MIN_ORDER;
   }
-  struct slab_cache *slab_cache = _slab_allocator_get_cache(order);
+  struct slab_cache *const slab_cache = _slab_allocator_get_cache(order);
   if (!slab_cache) {
     return NULL;
   }
   return _slab_cache_alloc(slab_cache);
 }
 
-void _slab_free(struct slab *slab, void *obj) {
+void _slab_free(struct slab *slab, const void *obj) {
   // Find the position of the object in the freelist.
-  size_t off = obj - slab->data;
-  unsigned order = slab->parent->order;
+  const size_t off = obj - slab->data;
+  const unsigned order = slab->parent->order;
 
   // Assert that the offset is aligned to the size of the object.
   assert(!(off & ((1u << order) - 1)));
 
   // Find index of the allocated element in the freelist.
-  uint8_t index = off >> order, i;
+  const uint8_t index = off >> order;
+  uint8_t i;
   for (i = 0; i < slab->parent->elements && slab->freelist[i] != index; ++i) {
   }
   assert(i < slab->parent->elements);
@@ -274,8 +279,8 @@ void _slab_free(struct slab *slab, void *obj) {
  * wrapper around it which does some handling on the parent `struct slab_cache`
  * -- there's no reason it can't be combined with that function.
  */
-void _slab_cache_free(struct slab *slab, void *obj) {
-  struct slab_cache *slab_cache = slab->parent;
+void _slab_cache_free(struct slab *slab, const void *obj) {
+  struct slab_cache *const slab_cache = slab->parent;
 
   bool is_slab_orig_full = slab->allocated == slab->parent->elements;
 
@@ -292,11 +297,11 @@ void _slab_cache_free(struct slab *slab, void *obj) {
   }
 }
 
-void kfree(void *obj) {
-  struct page *pg = phys_get_page(obj);
+void kfree(const void *obj) {
+  struct page *const pg = phys_rra_get_page(phys_mem_get_rra(), VM_TO_IDM(obj));
   assert(pg);
 
-  struct slab *slab = pg->context.slab;
+  struct slab *const slab = pg->context.slab;
   assert(slab);
 
   _slab_cache_free(slab, obj);

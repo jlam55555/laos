@@ -1,26 +1,30 @@
-#include "mem/slab.h"
-
-#include "test/test.h"
-
 /**
- * Like PG_ALIGNED, but for an arbitrary power-of-two sz.
+ * These tests are for `kmalloc()` only, and don't require setting up a custom
+ * allocator. Unit tests for internal functions, and tests that set up a custom
+ * slab cache should go directly in mem/slab.c.
  *
- * This macro also checks that sz is a power-of-two, but that's not strictly
- * necessary.
- */
-#define ALIGNED(ptr, sz) (!(sz & (sz - 1)) && !((uint64_t)ptr & (sz - 1)))
-
-/** This test depends on environmental factors. If you run low on space, this
- * will fail. This should be made more hermetic by initializing separate slab
- * allocators outside of the normal MM system. On a regular machine with plenty
- * of memory, this should succeed just fine. If it starts failing, we have a
- * problem (and also some unfreed memory)!
+ * These tests depend on environmental factors, but shouldn't be a problem
+ * unless we're OOM.
+ *
+ * TODO(jlam55555): May want to expose more of the slab mechanism as public
+ * functions so that it is more easily testable.
  *
  * TODO(jlam55555): Define lifecycle tests for test initialization and cleanup.
  * Cleanup is more important, because initialization can happen anywhere in the
  * test.
  */
-DEFINE_TEST(slab, can_alloc_aligned) {
+
+#include "mem/slab.h"
+
+#include "test/test.h"
+
+/**
+ * Like PG_ALIGNED, but for an arbitrary power-of-two sz. This macro also checks
+ * that sz is a power-of-two, but perhaps that's overkill.
+ */
+#define ALIGNED(ptr, sz) (!(sz & (sz - 1)) && !((uint64_t)ptr & (sz - 1)))
+
+DEFINE_TEST(slab, kmalloc_aligned) {
   void *alloc1 = kmalloc(16);
   TEST_ASSERT(alloc1);
   TEST_ASSERT(ALIGNED(alloc1, 16));
@@ -32,7 +36,7 @@ DEFINE_TEST(slab, can_alloc_aligned) {
   kfree(alloc2);
 }
 
-DEFINE_TEST(slab, can_alloc_unaligned) {
+DEFINE_TEST(slab, kmalloc_unaligned) {
   void *alloc1 = kmalloc(5);
   TEST_ASSERT(alloc1);
   TEST_ASSERT(ALIGNED(alloc1, 8));
@@ -56,7 +60,7 @@ DEFINE_TEST(slab, can_alloc_unaligned) {
 
 #undef ALIGNED
 
-DEFINE_TEST(slab, min_max_alloc_size) {
+DEFINE_TEST(slab, kmalloc_extreme_orders) {
   // Can alloc largest alloc order.
   void *alloc1 = kmalloc(1u << SLAB_MAX_ORDER);
   TEST_ASSERT(alloc1);
@@ -77,7 +81,7 @@ DEFINE_TEST(slab, min_max_alloc_size) {
   kfree(alloc4);
 }
 
-DEFINE_TEST(slab, alloc_not_same) {
+DEFINE_TEST(slab, kmalloc_not_same_address) {
   void *alloc1 = kmalloc(16);
   TEST_ASSERT(alloc1);
   void *alloc2 = kmalloc(16);
@@ -95,7 +99,7 @@ DEFINE_TEST(slab, alloc_not_same) {
  * Our slab allocator doesn't have to guarantee this, but it's a nice property
  * to have.
  */
-DEFINE_TEST(slab, alloc_last_freed) {
+DEFINE_TEST(slab, kmalloc_last_freed_realloc) {
   void *alloc1 = kmalloc(16);
   TEST_ASSERT(alloc1);
   kfree(alloc1);
@@ -107,6 +111,7 @@ DEFINE_TEST(slab, alloc_last_freed) {
   kfree(alloc2);
 }
 
+// TODO(jlam55555): Test allocs/frees out of order.
 // TODO(jlam55555): Tests to ensure that memory is R/W-able, run out of memory,
 // etc.
 // TODO(jlam55555): Internal unit tests to make sure that slab bookkeeping is

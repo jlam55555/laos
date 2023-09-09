@@ -14,7 +14,7 @@
  */
 struct pmlx_entry *_virt_alloc_pmlx_table(void) {
   struct pmlx_entry *rv;
-  assert(rv = phys_page_alloc());
+  assert(rv = phys_alloc_page());
   memset(rv, 0, PG_SZ);
   return rv;
 }
@@ -44,7 +44,7 @@ void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
     /* TODO(jlam55555): Turn this into a function. */                          \
     pmle->p = true;                                                            \
     pmle->addr =                                                               \
-        ((size_t)VM_TO_DIRECT(_virt_alloc_pmlx_table()) & (PM_MAX_BIT - 1)) >> \
+        ((size_t)VM_TO_IDM(_virt_alloc_pmlx_table()) & (PM_MAX_BIT - 1)) >>    \
         PG_SZ_BITS;                                                            \
     pmle->rw = true;                                                           \
   }                                                                            \
@@ -153,14 +153,14 @@ void virt_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count,
   _virt_map_region(pml4, video_mem, VM_TO_HHDM(video_mem), PG_SZ);
 
   // Switch to the new page table, which should be a physical address.
-  _virt_set_pt(VM_TO_DIRECT(pml4));
+  _virt_set_pt(VM_TO_IDM(pml4));
 
   // Video memory is now mapped in.
   struct console_driver *console_driver = get_default_console_driver();
   console_driver->enable(console_driver->dev);
 
   // Allocate the new stack. Go to top of stack and put in HM.
-  void *new_stack = phys_page_alloc();
+  void *new_stack = phys_alloc_page();
   assert(new_stack);
   new_stack += PG_SZ;
 

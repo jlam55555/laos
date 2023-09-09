@@ -152,6 +152,8 @@ kernel: $(KERNEL_OUT_DIR)/$(KERNEL)
 	@ # Prevent the default cc rule from being run.
 
 # Include header dependencies.
+# TODO(jlam55555): I'm not sure how this works, and it doesn't seem that `make` is
+# correctly rebuilding targets on header changes.
 -include $(HEADER_DEPS)
 
 # Compilation rules for *.c files.

@@ -6,110 +6,10 @@
 #include <assert.h>
 #include <limine.h>
 
-// TODO(jlam55555): Handle hugepage allocation.
-
 /**
- * State variable singleton struct for the physical memory allocator.
+ * Main physical memory page allocator.
  */
-static struct _phys_rr_allocator {
-  /**
-   * Store information about each `struct page`.
-   *
-   * Will be a HM address, since the new PT won't include a LM identity map.
-   *
-   * N.B. This was previously a bitmap that only stored whether each physical
-   * page was allocated, but now we want to store more more info per page.
-   */
-  struct page *mem_bitmap;
-
-  /**
-   * Physical memory statistics. total_sz == total_pg * PG_SZ, included for
-   * convenience. Total size is the end of the physical address space.
-   *
-   * Note that unusable_pg is counted in the total_pg but not the allocated_pg.
-   * That is, total_pg = allocated_pg + unusable_pg + <free pg>. This definition
-   * may change in the future if a more convenient definition arises.
-   *
-   * Note also that unusable_pg includes bootloader reclaimable memory before it
-   * has been freed. This choice is somewhat arbitrary -- these pages could
-   * alternatively have been marked as allocated to prevent their use.
-   */
-  size_t total_sz;
-  size_t total_pg;
-  size_t allocated_pg;
-  size_t unusable_pg;
-
-  /**
-   * Round-robin scheduling.
-   */
-  size_t needle;
-} _phys_allocator;
-
-/**
- * Helper function for allocating a physical page. Errors if the page is
- * unusable (e.g., hole memory).
- *
- * Returns true iff the physical page is free.
- */
-static bool _phys_page_alloc(void *addr) {
-  addr = VM_TO_DIRECT(addr);
-  size_t pg = (size_t)addr >> PG_SZ_BITS;
-  assert(pg < _phys_allocator.total_pg);
-  assert(!_phys_allocator.mem_bitmap[pg].unusable);
-  if (_phys_allocator.mem_bitmap[pg].present) {
-    // Already allocated.
-    return false;
-  }
-  _phys_allocator.mem_bitmap[pg].present = true;
-  ++_phys_allocator.allocated_pg;
-  return true;
-}
-
-/**
- * Helper function for freeing a physical page. Errors if the page is unusable
- * (e.g., hole memory).
- *
- * Returns true iff the physical page is allocated.
- */
-static bool _phys_page_free(void *addr) {
-  assert(PG_ALIGNED(addr));
-  size_t pg = (size_t)addr >> PG_SZ_BITS;
-  assert(!_phys_allocator.mem_bitmap[pg].unusable);
-  if (!_phys_allocator.mem_bitmap[pg].present) {
-    // Not allocated.
-    return false;
-  }
-  _phys_allocator.mem_bitmap[pg].present = false;
-  --_phys_allocator.allocated_pg;
-  return true;
-}
-
-/**
- * Helper function to force allocation of all physical page regions. This is
- * only used during initialization and all the pages in this region are assumed
- * to be free.
- *
- * For unusable pages, do not actually allocate -- we simply mark it as
- * unusable. This is because we don't want to include unusable regions in the
- * bookkeeping for allocatable pages.
- *
- * If this assumption is false, we error.
- */
-static void _phys_region_alloc(void *addr, size_t pg_count, bool is_unusable) {
-  for (size_t i = 0; i < pg_count; ++i, addr += PG_SZ) {
-    if (is_unusable) {
-      size_t pg = (size_t)addr >> PG_SZ_BITS;
-      assert(!_phys_allocator.mem_bitmap[pg].present);
-      _phys_allocator.mem_bitmap[pg].unusable = true;
-    } else {
-      assert(_phys_page_alloc(addr));
-    }
-  }
-  // Adjust unusable page counts.
-  if (is_unusable) {
-    _phys_allocator.unusable_pg += pg_count;
-  }
-}
+static struct phys_rra _phys_allocator;
 
 /**
  * Helper function for phys_reclaim_bootloader_mem(). Bootloader-reclaimable
@@ -119,7 +19,7 @@ static void _phys_region_alloc(void *addr, size_t pg_count, bool is_unusable) {
  */
 static void _phys_region_mark_usable(void *addr, size_t pg_count) {
   for (size_t i = 0; i < pg_count; ++i, addr += PG_SZ) {
-    size_t pg = (size_t)addr >> PG_SZ_BITS;
+    const size_t pg = (size_t)addr >> PG_SZ_BITS;
     assert(!_phys_allocator.mem_bitmap[pg].present);
     assert(_phys_allocator.mem_bitmap[pg].unusable);
     _phys_allocator.mem_bitmap[pg].unusable = false;
@@ -127,76 +27,16 @@ static void _phys_region_mark_usable(void *addr, size_t pg_count) {
   _phys_allocator.unusable_pg -= pg_count;
 }
 
-/**
- * Helper function to initialize the round robin allocator, such as zeroing the
- * bitmap.
- *
- * Note that we actually set mem_bitmap to the high-mem-mapped version of addr,
- * because we will not provide the low-mem identity mapping in the new
- * pagetable. (See mem/virt.h).
- *
- * TODO(jlam55555): We are making the subtle assumption here that VM_HM_START is
- * the same as Limine's VM addr start of HHDM. They should be the same value for
- * x86_64, but this is not guaranteed by the Limine spec. We can use the Limine
- * HHDM feature to get the start of the Limine HHDM LIMINE_HHDM, and assert that
- * LIMINE_HHDM <= VM_HM_START.
- *
- * TODO(jlam55555): This should really take an allocator as argument, but since
- * we only expect to have a single instance of a physical allocator this is fine
- * for now. We may want to make this change when doing performance testing
- * between multiple physical memory allocators.
- */
-static void _phys_rr_allocator_init(void *addr, size_t mem_limit,
-                                    struct limine_memmap_entry *init_mmap,
-                                    size_t entry_count) {
-  _phys_allocator.total_sz = mem_limit;
-  _phys_allocator.total_pg = mem_limit >> PG_SZ_BITS;
-  _phys_allocator.allocated_pg = 0;
-  _phys_allocator.needle = 0;
-
-  // Use HM version of address.
-  _phys_allocator.mem_bitmap = VM_TO_HHDM(addr);
-
-  // Initialize bitmap. bm_sz = "bitmap size"
-  size_t bm_sz = _phys_allocator.total_pg * sizeof(struct page);
-  memset(_phys_allocator.mem_bitmap, 0, bm_sz);
-
-  // Mark bitmap pages as allocated. We use the physical address here rather
-  // than the HHDM address.
-  _phys_region_alloc(VM_TO_DIRECT(_phys_allocator.mem_bitmap), PG_COUNT(bm_sz),
-                     false);
-
-  // Mark unusable regions in the bitmap.
-  void *prev_end = NULL;
-  for (size_t mmap_entry_i = 0; mmap_entry_i < entry_count; ++mmap_entry_i) {
-    struct limine_memmap_entry *mmap_entry = init_mmap + mmap_entry_i;
-
-    // Memory hole detected. Mark it as unusable memory.
-    if ((size_t)prev_end != mmap_entry->base) {
-      _phys_region_alloc(VM_TO_DIRECT(prev_end),
-                         PG_COUNT((void *)mmap_entry->base - prev_end), true);
-    }
-    prev_end = (void *)(mmap_entry->base + mmap_entry->length);
-
-    // Mark unusable memory regions. (This includes bootloader-reclaimable
-    // memory regions, which will be freed/marked usable later on.)
-    if (mmap_entry->type != LIMINE_MEMMAP_USABLE) {
-      _phys_region_alloc(VM_TO_DIRECT(mmap_entry->base),
-                         PG_COUNT(mmap_entry->length), true);
-    }
-  }
-}
-
 void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   // Memory limit is the maximum limit of the physical memory space,
   // including memory holes.
-  size_t mem_limit =
+  const size_t mem_limit =
       init_mmap[entry_count - 1].base + init_mmap[entry_count - 1].length;
   assert(PG_ALIGNED(mem_limit));
 
   // Bitmap size is (dimensional analysis):
   // mem_limit bytes * page/4096bytes * sizeof(struct page) bytes/page.
-  size_t bm_sz = (mem_limit >> PG_SZ_BITS) * sizeof(struct page);
+  const size_t bm_sz = (mem_limit >> PG_SZ_BITS) * sizeof(struct page);
 
 #ifdef DEBUG
   // For diagnostic purposes.
@@ -252,7 +92,8 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
   assert((size_t)mem_bitmap_paddr + bm_sz <= 4 * GiB);
 
   // Initialize the round robin allocator.
-  _phys_rr_allocator_init(mem_bitmap_paddr, mem_limit, init_mmap, entry_count);
+  phys_rra_init(&_phys_allocator, mem_bitmap_paddr, mem_limit, init_mmap,
+                entry_count);
 }
 
 void phys_reclaim_bootloader_mem(struct limine_memmap_entry *init_mmap,
@@ -266,65 +107,129 @@ void phys_reclaim_bootloader_mem(struct limine_memmap_entry *init_mmap,
   }
 }
 
-/**
- * Round-robin page allocator.
- */
-void *phys_page_alloc(void) { return phys_page_alloc_order(0); }
+void *phys_alloc_page(void) {
+  const void *rv = phys_rra_alloc_order(&_phys_allocator, 0);
+  if (rv) {
+    return VM_TO_HHDM(rv);
+  }
+  return NULL;
+}
 
-void phys_page_free(void *pg) { assert(_phys_page_free(VM_TO_DIRECT(pg))); }
+void phys_free_page(const void *pg) {
+  assert(phys_rra_free(&_phys_allocator, VM_TO_IDM(pg)));
+}
 
-bool _phys_can_alloc_order_at(struct _phys_rr_allocator *allocator,
-                              size_t order) {
-  size_t pages = 1u << order;
+struct phys_rra *phys_mem_get_rra(void) {
+  return &_phys_allocator;
+}
 
-  // Not enough contiguous pages left after the needle.
-  if (allocator->needle + pages > allocator->total_pg) {
+bool phys_rra_alloc(struct phys_rra *rra, const void *addr) {
+  const size_t pg = (size_t)addr >> PG_SZ_BITS;
+  assert(pg < rra->total_pg);
+  assert(!rra->mem_bitmap[pg].unusable);
+  if (rra->mem_bitmap[pg].present) {
+    // Already allocated.
     return false;
   }
-
-  struct page *entry = allocator->mem_bitmap + allocator->needle;
-  for (size_t i = 0; i < pages; ++i, ++entry) {
-    if (entry->present || entry->unusable) {
-      return false;
-    }
-  }
+  rra->mem_bitmap[pg].present = true;
+  ++rra->allocated_pg;
   return true;
 }
 
-void *phys_page_alloc_order(unsigned order) {
-  if (_phys_allocator.allocated_pg == _phys_allocator.total_pg) {
-    // OOM
-    return NULL;
+bool phys_rra_free(struct phys_rra *rra, const void *addr) {
+  assert(PG_ALIGNED(addr));
+  const size_t pg = (size_t)addr >> PG_SZ_BITS;
+  assert(!rra->mem_bitmap[pg].unusable);
+  if (!rra->mem_bitmap[pg].present) {
+    // Not allocated.
+    return false;
   }
-
-  size_t start_needle = _phys_allocator.needle;
-  size_t pages = 1u << order;
-  while (!_phys_can_alloc_order_at(&_phys_allocator, order)) {
-    if (++_phys_allocator.needle >= _phys_allocator.total_pg) {
-      _phys_allocator.needle -= _phys_allocator.total_pg;
-    }
-
-    // Could not allocate at this size.
-    if (_phys_allocator.needle == start_needle) {
-      return NULL;
-    }
-  }
-
-  void *phys_addr = (void *)((size_t)_phys_allocator.needle << PG_SZ_BITS);
-  _phys_region_alloc(phys_addr, pages, false);
-
-  return VM_TO_HHDM(phys_addr);
+  rra->mem_bitmap[pg].present = false;
+  --rra->allocated_pg;
+  return true;
 }
 
-void phys_page_free_order(void *pg, unsigned order) {
-  size_t pages = 1u << order;
-  for (unsigned i = 0; i < pages; ++i, pg += PG_SZ) {
-    assert(_phys_page_free(VM_TO_DIRECT(pg)));
+/**
+ * Helper function to force allocation of all physical page regions. This is
+ * only used during initialization and all the pages in this region are assumed
+ * to be free.
+ *
+ * For unusable pages, do not actually allocate -- we simply mark it as
+ * unusable. This is because we don't want to include unusable regions in the
+ * bookkeeping for allocatable pages.
+ *
+ * If this assumption is false, we error.
+ */
+static void _phys_rra_alloc_region(struct phys_rra *rra, void *addr,
+                                   size_t pg_count, bool is_unusable) {
+  for (size_t i = 0; i < pg_count; ++i, addr += PG_SZ) {
+    if (is_unusable) {
+      size_t pg = (size_t)addr >> PG_SZ_BITS;
+      assert(!rra->mem_bitmap[pg].present);
+      rra->mem_bitmap[pg].unusable = true;
+    } else {
+      assert(phys_rra_alloc(rra, addr));
+    }
+  }
+  // Adjust unusable page counts.
+  if (is_unusable) {
+    rra->unusable_pg += pg_count;
   }
 }
 
-struct page *phys_get_page(void *pg) {
-  return &_phys_allocator.mem_bitmap[(size_t)VM_TO_DIRECT(pg) >> PG_SZ_BITS];
+/**
+ * Note that we actually set mem_bitmap to the high-mem-mapped version of addr,
+ * because we will not provide the low-mem identity mapping in the new
+ * pagetable. (See mem/virt.h).
+ *
+ * TODO(jlam55555): We are making the subtle assumption here that VM_HM_START is
+ * the same as Limine's VM addr start of HHDM. They should be the same value for
+ * x86_64, but this is not guaranteed by the Limine spec. We can use the Limine
+ * HHDM feature to get the start of the Limine HHDM LIMINE_HHDM, and assert that
+ * LIMINE_HHDM <= VM_HM_START.
+ */
+void phys_rra_init(struct phys_rra *rra, void *addr, size_t mem_limit,
+                   struct limine_memmap_entry *init_mmap, size_t entry_count) {
+  rra->total_sz = mem_limit;
+  rra->total_pg = mem_limit >> PG_SZ_BITS;
+  rra->allocated_pg = 0;
+  rra->needle = 0;
+
+  // Use HM version of address.
+  rra->mem_bitmap = VM_TO_HHDM(addr);
+
+  // Initialize bitmap. bm_sz = "bitmap size"
+  const size_t bm_sz = rra->total_pg * sizeof(struct page);
+  memset(rra->mem_bitmap, 0, bm_sz);
+
+  // Mark bitmap pages as allocated. This should only be done for the main rra,
+  // as other bootstrapped rras (e.g., for testing) will not reference
+  // themselves.
+  if (rra == &_phys_allocator) {
+    _phys_rra_alloc_region(rra, VM_TO_IDM(rra->mem_bitmap), PG_COUNT(bm_sz),
+                           false);
+  }
+
+  // Mark unusable regions in the bitmap.
+  void *prev_end = NULL;
+  for (size_t mmap_entry_i = 0; mmap_entry_i < entry_count; ++mmap_entry_i) {
+    struct limine_memmap_entry *mmap_entry = init_mmap + mmap_entry_i;
+
+    // Memory hole detected. Mark it as unusable memory.
+    if ((size_t)prev_end != mmap_entry->base) {
+      _phys_rra_alloc_region(rra, VM_TO_IDM(prev_end),
+                             PG_COUNT((void *)mmap_entry->base - prev_end),
+                             true);
+    }
+    prev_end = (void *)(mmap_entry->base + mmap_entry->length);
+
+    // Mark unusable memory regions. (This includes bootloader-reclaimable
+    // memory regions, which will be freed/marked usable later on.)
+    if (mmap_entry->type != LIMINE_MEMMAP_USABLE) {
+      _phys_rra_alloc_region(rra, VM_TO_IDM(mmap_entry->base),
+                             PG_COUNT(mmap_entry->length), true);
+    }
+  }
 }
 
 void phys_mem_print_stats(void) {
@@ -336,4 +241,63 @@ void phys_mem_print_stats(void) {
          _phys_allocator.allocated_pg << PG_SZ_BITS,
          _phys_allocator.total_sz -
              (_phys_allocator.unusable_pg << PG_SZ_BITS));
+}
+
+/**
+ * Helper function to check if a continuous region of size 2^order can be
+ * allocated at the current needle position in `rra`.
+ */
+bool _phys_rra_can_alloc_order_at(const struct phys_rra *rra, size_t order) {
+  const size_t pages = 1u << order;
+
+  // Not enough contiguous pages left after the needle.
+  if (rra->needle + pages > rra->total_pg) {
+    return false;
+  }
+
+  const struct page *entry = rra->mem_bitmap + rra->needle;
+  for (size_t i = 0; i < pages; ++i, ++entry) {
+    if (entry->present || entry->unusable) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void *phys_rra_alloc_order(struct phys_rra *rra, unsigned order) {
+  if (rra->allocated_pg == rra->total_pg) {
+    // OOM
+    return NULL;
+  }
+
+  const size_t start_needle = rra->needle;
+  const size_t pages = 1u << order;
+  while (!_phys_rra_can_alloc_order_at(rra, order)) {
+    if (++rra->needle >= rra->total_pg) {
+      rra->needle -= rra->total_pg;
+    }
+
+    // Could not allocate at this size.
+    if (rra->needle == start_needle) {
+      return NULL;
+    }
+  }
+
+  // Don't move to the end of the allocated region. Although we could. This
+  // behavior is nicer if we often free a page right after allocating it.
+  void *phys_addr = (void *)((size_t)rra->needle << PG_SZ_BITS);
+  _phys_rra_alloc_region(rra, phys_addr, pages, false);
+
+  return phys_addr;
+}
+
+void phys_rra_free_order(struct phys_rra *rra, const void *pg, unsigned order) {
+  const size_t pages = 1u << order;
+  for (unsigned i = 0; i < pages; ++i, pg += PG_SZ) {
+    assert(phys_rra_free(rra, pg));
+  }
+}
+
+struct page *phys_rra_get_page(struct phys_rra *rra, const void *pg) {
+  return &rra->mem_bitmap[(size_t)pg >> PG_SZ_BITS];
 }
