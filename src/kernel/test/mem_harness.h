@@ -1,17 +1,15 @@
 /**
- * Set up a custom physical memory allocator. This depends on the main physical
- * allocator (to get pages for the backing buffer) and the main slab allocator
- * (for `kmalloc()`).
+ * Test harness and utilities for setting up a custom physical memory page
+ * allocator or slab allocator. This depends on the main physical allocator (to
+ * get pages for the backing buffer) and the main slab allocator (for
+ * `kmalloc()`).
  *
  * TODO(jlam55555): Have a more official test fixture (setup/teardown)
- * framework.
- *
- * TODO(jlam55555): Rename this file since we also test slab allocator stuff
- * here.
+ * framework.p
  */
 
-#ifndef TEST_PHYS_FIXTURE_H
-#define TEST_PHYS_FIXTURE_H
+#ifndef TEST_MEM_HARNESS_H
+#define TEST_MEM_HARNESS_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -49,4 +47,4 @@ inline bool _phys_test_overlaps(void *start1, size_t len1, void *start2,
   TEST_ASSERT_NOVERLAP2(b, b_sz, d, d_sz);                                     \
   TEST_ASSERT_NOVERLAP2(c, c_sz, d, d_sz)
 
-#endif // TEST_PHYS_FIXTURE_H
+#endif // TEST_MEM_HARNESS_H

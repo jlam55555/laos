@@ -1,4 +1,4 @@
-#include "test/phys_fixture.h"
+#include "test/mem_harness.h"
 
 #include "arch/x86_64/pt.h" // VM_TO_IDM
 #include "mem/phys.h"       // phys_rra
@@ -15,15 +15,14 @@ struct phys_rra *phys_fixture_create_rra(void) {
   void *bb = phys_rra_alloc_order(phys_mem_get_rra(), 4);
   assert(bb);
 
-  const size_t base = PG_SZ;
   const size_t length = 16 * PG_SZ;
   struct limine_memmap_entry mmap_entries[] = {
-      {.base = base, .length = length, .type = LIMINE_MEMMAP_USABLE},
+      {.base = 0x0, .length = length, .type = LIMINE_MEMMAP_USABLE},
   };
   const size_t entry_count = sizeof(mmap_entries) / sizeof(mmap_entries[0]);
 
   struct phys_rra *rra = kmalloc(sizeof(struct phys_rra));
-  phys_rra_init(rra, VM_TO_IDM(page_array_bb), base + length, mmap_entries,
+  phys_rra_init(rra, VM_TO_IDM(page_array_bb), length, mmap_entries,
                 entry_count, bb);
 
   return rra;

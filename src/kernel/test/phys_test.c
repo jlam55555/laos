@@ -1,9 +1,10 @@
 #include "mem/phys.h"
 
+#include <limine.h>
+
 #include "arch/x86_64/pt.h"
-#include "limine.h"
 #include "mem/slab.h"
-#include "test/phys_fixture.h"
+#include "test/mem_harness.h"
 #include "test/test.h"
 
 /**

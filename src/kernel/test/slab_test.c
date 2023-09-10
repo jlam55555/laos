@@ -3,17 +3,14 @@
  *
  * These tests depend on environmental factors, but shouldn't be a problem
  * unless we're OOM.
- *
- * TODO(jlam55555): Define lifecycle tests for test initialization and cleanup.
- * Cleanup is more important, because initialization can happen anywhere in the
- * test.
  */
 
 #include "mem/slab.h"
 
-#include "test/phys_fixture.h"
-#include "test/test.h"
 #include <stdint.h>
+
+#include "test/mem_harness.h"
+#include "test/test.h"
 
 /**
  * Like PG_ALIGNED, but for an arbitrary power-of-two sz. This macro also checks
@@ -287,6 +284,101 @@ DEFINE_TEST(slab, lifecycle_leakproof) {
 /**
  * Test caches with different orders (and simultaneously).
  */
-DEFINE_TEST(slab, small_order_caches) { TEST_ASSERT(false); }
-DEFINE_TEST(slab, large_order_caches) { TEST_ASSERT(false); }
-DEFINE_TEST(slab, multiple_caches_different_orders) { TEST_ASSERT(false); }
+DEFINE_TEST(slab, small_order_caches) {
+  struct slab_cache *cache;
+  TEST_ASSERT(cache = slab_fixture_create_slab_cache(5));
+
+  void *alloced[10];
+  for (unsigned i = 0; i < 10; ++i) {
+    TEST_ASSERT(alloced[i] = slab_cache_alloc(cache));
+  }
+
+  for (unsigned i = 0; i < 10; ++i) {
+    slab_cache_free(cache, NULL, alloced[i]);
+  }
+
+  slab_fixture_destroy_slab_cache(cache);
+}
+
+DEFINE_TEST(slab, large_order_caches) {
+  struct slab_cache *cache;
+  TEST_ASSERT(cache = slab_fixture_create_slab_cache(15));
+
+  void *alloced[2];
+  for (unsigned i = 0; i < 2; ++i) {
+    TEST_ASSERT(alloced[i] = slab_cache_alloc(cache));
+  }
+
+  for (unsigned i = 0; i < 2; ++i) {
+    slab_cache_free(cache, NULL, alloced[i]);
+  }
+
+  slab_fixture_destroy_slab_cache(cache);
+}
+
+DEFINE_TEST(slab, multiple_caches_different_orders) {
+  struct slab_cache *cache1;
+  TEST_ASSERT(cache1 = slab_fixture_create_slab_cache(14));
+  struct slab_cache *cache2 = kmalloc(sizeof(struct slab_cache));
+  slab_cache_init(cache2, cache1->allocator, 5);
+  TEST_ASSERT(cache2);
+
+  void *objs[8];
+
+  // Random sequence of allocations with order 14 (4KiB) and order 5 (32B)
+  // caches.
+  TEST_ASSERT(objs[0] = slab_cache_alloc(cache1));
+  TEST_ASSERT(objs[1] = slab_cache_alloc(cache2));
+  TEST_ASSERT(objs[2] = slab_cache_alloc(cache1));
+  TEST_ASSERT(objs[3] = slab_cache_alloc(cache2));
+  TEST_ASSERT(objs[4] = slab_cache_alloc(cache2));
+  TEST_ASSERT(objs[5] = slab_cache_alloc(cache1));
+  TEST_ASSERT(!(objs[6] = slab_cache_alloc(cache1)));
+  TEST_ASSERT(objs[6] = slab_cache_alloc(cache2));
+  TEST_ASSERT(objs[7] = slab_cache_alloc(cache2));
+
+  slab_cache_free(cache1, NULL, objs[0]);
+  slab_cache_free(cache1, NULL, objs[2]);
+  slab_cache_free(cache1, NULL, objs[5]);
+
+  slab_cache_free(cache2, NULL, objs[1]);
+  slab_cache_free(cache2, NULL, objs[3]);
+  slab_cache_free(cache2, NULL, objs[4]);
+  slab_cache_free(cache2, NULL, objs[6]);
+  slab_cache_free(cache2, NULL, objs[7]);
+
+  slab_cache_destroy(cache2);
+  kfree(cache2);
+  slab_fixture_destroy_slab_cache(cache1);
+}
+
+/**
+ * Try many allocations/deallocations.
+ */
+DEFINE_TEST(slab, stress_test) {
+  struct slab_cache *cache;
+  TEST_ASSERT(cache = slab_fixture_create_slab_cache(4));
+
+  // Roughly 8KiB (2 pages).
+  void **alloced = kmalloc(1000 * sizeof(void *));
+
+  for (unsigned i = 0; i < 1000; ++i) {
+    TEST_ASSERT(alloced[i] = slab_cache_alloc(cache));
+  }
+
+  for (unsigned i = 0; i < 1000; ++i) {
+    slab_cache_free(cache, NULL, alloced[i]);
+  }
+
+  for (unsigned i = 0; i < 1000; ++i) {
+    TEST_ASSERT(alloced[i] = slab_cache_alloc(cache));
+  }
+
+  for (unsigned i = 0; i < 1000; ++i) {
+    slab_cache_free(cache, NULL, alloced[i]);
+  }
+
+  kfree(alloced);
+
+  slab_fixture_destroy_slab_cache(cache);
+}

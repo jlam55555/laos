@@ -2,7 +2,6 @@
 
 #include "arch/x86_64/pt.h"
 #include "common/libc.h"
-#include "test/phys_fixture.h"
 
 #include <assert.h>
 #include <limine.h>
