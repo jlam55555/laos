@@ -93,7 +93,7 @@ struct page {
   uint64_t : 62; // 8
 
   // Used to store metadata about the page. Depends on the type of page this is.
-  // More entries may be added as more page types appear
+  // More entries may be added as more page types appear.
   union {
     // The slab object, if this is a backing page for a slab.
     struct slab *slab; // 8
@@ -135,9 +135,18 @@ struct phys_rra {
   size_t unusable_pg;
 
   /**
-   * Round-robin scheduling.
+   * Round-robin (first-fit) allocation.
    */
   size_t needle;
+
+  /**
+   * Offset of the physical memory backing this allocator. This should be 0 in
+   * the main allocator (since the backing buffer is the true physical memory),
+   * and should be set to the offset of the backing buffer used in a testing
+   * situation. This offset will be added/subtracted to the returned physical
+   * address on allocation/frees.
+   */
+  void *phys_offset;
 };
 
 /**
@@ -197,7 +206,8 @@ bool phys_rra_free(struct phys_rra *, const void *pg);
  * Addresses in `init_mmap` are allowed to be in the HHDM, for convenience.
  */
 void phys_rra_init(struct phys_rra *, void *addr, size_t mem_limit,
-                   struct limine_memmap_entry *init_mmap, size_t entry_count);
+                   struct limine_memmap_entry *init_mmap, size_t entry_count,
+                   void *phys_offset);
 
 /**
  * Allocates/frees a continuous region of 2^order pages. Returns NULL if no such

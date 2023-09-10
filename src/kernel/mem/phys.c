@@ -2,6 +2,7 @@
 
 #include "arch/x86_64/pt.h"
 #include "common/libc.h"
+#include "test/phys_fixture.h"
 
 #include <assert.h>
 #include <limine.h>
@@ -93,7 +94,7 @@ void phys_mem_init(struct limine_memmap_entry *init_mmap, size_t entry_count) {
 
   // Initialize the round robin allocator.
   phys_rra_init(&_phys_allocator, mem_bitmap_paddr, mem_limit, init_mmap,
-                entry_count);
+                entry_count, 0);
 }
 
 void phys_reclaim_bootloader_mem(struct limine_memmap_entry *init_mmap,
@@ -124,7 +125,7 @@ struct phys_rra *phys_mem_get_rra(void) {
 }
 
 bool phys_rra_alloc(struct phys_rra *rra, const void *addr) {
-  const size_t pg = (size_t)addr >> PG_SZ_BITS;
+  const size_t pg = (size_t)(addr - rra->phys_offset) >> PG_SZ_BITS;
   assert(pg < rra->total_pg);
   assert(!rra->mem_bitmap[pg].unusable);
   if (rra->mem_bitmap[pg].present) {
@@ -138,7 +139,7 @@ bool phys_rra_alloc(struct phys_rra *rra, const void *addr) {
 
 bool phys_rra_free(struct phys_rra *rra, const void *addr) {
   assert(PG_ALIGNED(addr));
-  const size_t pg = (size_t)addr >> PG_SZ_BITS;
+  const size_t pg = (size_t)(addr - rra->phys_offset) >> PG_SZ_BITS;
   assert(!rra->mem_bitmap[pg].unusable);
   if (!rra->mem_bitmap[pg].present) {
     // Not allocated.
@@ -189,11 +190,13 @@ static void _phys_rra_alloc_region(struct phys_rra *rra, void *addr,
  * LIMINE_HHDM <= VM_HM_START.
  */
 void phys_rra_init(struct phys_rra *rra, void *addr, size_t mem_limit,
-                   struct limine_memmap_entry *init_mmap, size_t entry_count) {
+                   struct limine_memmap_entry *init_mmap, size_t entry_count,
+                   void *phys_offset) {
   rra->total_sz = mem_limit;
   rra->total_pg = mem_limit >> PG_SZ_BITS;
   rra->allocated_pg = 0;
   rra->needle = 0;
+  rra->phys_offset = phys_offset;
 
   // Use HM version of address.
   rra->mem_bitmap = VM_TO_HHDM(addr);
@@ -286,8 +289,8 @@ void *phys_rra_alloc_order(struct phys_rra *rra, unsigned order) {
   // Don't move to the end of the allocated region. Although we could. This
   // behavior is nicer if we often free a page right after allocating it.
   void *phys_addr = (void *)((size_t)rra->needle << PG_SZ_BITS);
+  phys_addr += (uint64_t)rra->phys_offset;
   _phys_rra_alloc_region(rra, phys_addr, pages, false);
-
   return phys_addr;
 }
 
@@ -299,5 +302,6 @@ void phys_rra_free_order(struct phys_rra *rra, const void *pg, unsigned order) {
 }
 
 struct page *phys_rra_get_page(struct phys_rra *rra, const void *pg) {
+  pg -= (uint64_t)rra->phys_offset;
   return &rra->mem_bitmap[(size_t)pg >> PG_SZ_BITS];
 }

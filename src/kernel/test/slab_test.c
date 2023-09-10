@@ -11,6 +11,7 @@
 
 #include "mem/slab.h"
 
+#include "test/phys_fixture.h"
 #include "test/test.h"
 
 /**
@@ -27,7 +28,7 @@ DEFINE_TEST(slab, kmalloc_aligned) {
 
   void *alloc2 = kmalloc(32);
   TEST_ASSERT(alloc2);
-  TEST_ASSERT(ALIGNED(alloc1, 32));
+  TEST_ASSERT(ALIGNED(alloc2, 32));
   kfree(alloc2);
 }
 
@@ -89,10 +90,8 @@ DEFINE_TEST(slab, kmalloc_not_same_address) {
 }
 
 /**
- * Test that the last freed object will be the next object allocated.
- *
- * Our slab allocator doesn't have to guarantee this, but it's a nice property
- * to have.
+ * Test that the last freed object will be the next object allocated. This is a
+ * guarantee of the slab allocator.
  */
 DEFINE_TEST(slab, kmalloc_last_freed_realloc) {
   void *alloc1 = kmalloc(16);
@@ -106,13 +105,61 @@ DEFINE_TEST(slab, kmalloc_last_freed_realloc) {
   kfree(alloc2);
 }
 
-// TODO(jlam55555): Test allocs/frees out of order.
-// TODO(jlam55555): Tests to ensure that memory is R/W-able, run out of memory,
-// etc.
-// TODO(jlam55555): Internal unit tests to make sure that slab bookkeeping is
-// correct.
-// TODO(jlam55555): Add unit tests for _slab_allocator_init,
-// TODO(jlam55555): Test that an initialized object will stay initialized.
-// _slab_allocator_get_cache, _slab_cache_alloc_slab,
-// _slab_cache_find_nonfull_slab, _slab_move_to_ll, _slab_cache_alloc,
-// _slab_free, _slab_cache_free
+/**
+ * Test `slab_{alloc,free}()`.
+ */
+DEFINE_TEST(slab, alloc) {
+  struct slab_cache *cache;
+  TEST_ASSERT(cache = slab_fixture_create_slab_cache(8));
+
+  void *v;
+  TEST_ASSERT(v = slab_cache_alloc(cache));
+
+  slab_cache_free(cache, NULL, v);
+
+  slab_fixture_destroy_slab_cache(cache);
+}
+
+/**
+ * Test allocs out of order.
+ */
+DEFINE_TEST(slab, alloc_multiple) { TEST_ASSERT(false); }
+
+/**
+ * Make sure slab-allocated memory is R/W-able.
+ */
+DEFINE_TEST(slab, alloc_rwable) { TEST_ASSERT(false); }
+
+/**
+ * Make sure slab-allocated memory persists between allocs/frees. I.e., this
+ * property ensures that the slab allocator can be used for caching initialized
+ * objects.
+ *
+ * This depends on the slab allocator always allocating the last freed object,
+ * which is tested in test "slab.kmalloc_last_freed_realloc".
+ */
+DEFINE_TEST(slab, remains_initialized_after_free_alloc_cycle) {
+  TEST_ASSERT(false);
+}
+
+/**
+ * Test `slab_cache_{alloc,free}()`.
+ */
+DEFINE_TEST(slab, cache_alloc) { TEST_ASSERT(false); }
+
+/**
+ * Test running out of memory in the physical memory manager.
+ */
+DEFINE_TEST(slab, oom) { TEST_ASSERT(false); }
+
+/**
+ * Check that no pages leak after creation, allocates/frees, and destruction.
+ */
+DEFINE_TEST(slab, lifecycle_leakproof) { TEST_ASSERT(false); }
+
+/**
+ * Test caches with different orders (and simultaneously).
+ */
+DEFINE_TEST(slab, small_order_caches) { TEST_ASSERT(false); }
+DEFINE_TEST(slab, large_order_caches) { TEST_ASSERT(false); }
+DEFINE_TEST(slab, multiple_caches_different_orders) { TEST_ASSERT(false); }

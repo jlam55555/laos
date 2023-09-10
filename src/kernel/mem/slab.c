@@ -2,6 +2,8 @@
 
 #include "arch/x86_64/pt.h"
 #include "common/libc.h"
+#include "common/list.h"
+#include "common/util.h"
 #include "mem/phys.h"
 
 #include <assert.h>
@@ -25,62 +27,14 @@ static struct slab_cache *_slab_allocator_get_cache(unsigned order) {
   return &_slab_caches[order - SLAB_MIN_ORDER];
 }
 
-/**
- * This function has a bit of a funny signature (which indicates that I should
- * really implement standardized LL macros.
- *
- * Usage: if you want to move slab from (its existing linked list) to
- * slab_cache->xyz_slabs, then call this like so:
- *
- *    slab_cache->xyz_slabs = _slab_move_to_ll(slab, slab_cache->xyz_slabs);
- *
- * The return value is for convenience. Alternatively, you can do:
- *
- *    _slab_move_to_ll(slab, slab_cache->xyz_slabs);
- *    slab_cache->xyz_slabs = slab;
- *
- * Maybe this should be a macro, and maybe I should add a sentinel node to the
- * slab LLs. It's not too big of a deal now but it might be when more LLs get
- * introduced.
- */
-static struct slab *_slab_move_to_ll(struct slab *slab, struct slab *ll) {
-  // Remove from current linked list.
-  if (slab->prev) {
-    slab->prev->next = slab->next;
-  }
-  if (slab->next) {
-    slab->next->prev = slab->prev;
-  }
-
-  // Prepend to the new linked list.
-  slab->prev = NULL;
-  slab->next = ll;
-
-  // For convenience; see comment above function.
-  return slab;
-}
-
-/**
- * Courtesy of bit-twiddling hacks:
- * https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
- */
-static unsigned _round_up_pow2(unsigned v) {
-  v--;
-  v |= v >> 1;
-  v |= v >> 2;
-  v |= v >> 4;
-  v |= v >> 8;
-  v |= v >> 16;
-  v++;
-  return v;
-}
-
 void slab_cache_init(struct slab_cache *slab_cache, struct phys_rra *rra,
                      unsigned order) {
   slab_cache->order = order;
-  slab_cache->empty_slabs = NULL;
-  slab_cache->partial_slabs = NULL;
-  slab_cache->full_slabs = NULL;
+
+  list_init(&slab_cache->empty_slabs);
+  list_init(&slab_cache->partial_slabs);
+  list_init(&slab_cache->full_slabs);
+
   slab_cache->allocator = rra;
 
   const size_t element_size = 1u << order;
@@ -104,7 +58,7 @@ void slab_cache_init(struct slab_cache *slab_cache, struct phys_rra *rra,
                 slab_cache->elements * sizeof(struct slab_freelist_item);
     assert(desc_size <= (1u << (order - 1)));
 
-    wasted = _round_up_pow2(desc_size) - desc_size;
+    wasted = (1u << ilog2ceil(desc_size)) - desc_size;
   }
 
 #ifdef DEBUG
@@ -113,6 +67,22 @@ void slab_cache_init(struct slab_cache *slab_cache, struct phys_rra *rra,
          slab_cache->order, slab_cache->pages, slab_cache->elements,
          _slab_cache_is_small(order), desc_size, wasted);
 #endif // DEBUG
+}
+
+void slab_cache_destroy(struct slab_cache *slab_cache) {
+#define CLEAR_LIST(field)                                                      \
+  while (!list_empty(&slab_cache->field)) {                                    \
+    struct slab *slab = list_entry(slab_cache->field.next, struct slab, ll);   \
+    slab_destroy(slab);                                                        \
+    if (!_slab_cache_is_small(slab_cache->order)) {                            \
+      kfree(slab);                                                             \
+    }                                                                          \
+  }
+
+  CLEAR_LIST(empty_slabs);
+  CLEAR_LIST(partial_slabs);
+  CLEAR_LIST(full_slabs);
+#undef CLEAR_LIST
 }
 
 void slab_allocators_init(void) {
@@ -124,7 +94,7 @@ void slab_allocators_init(void) {
 
 void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   void *const page =
-      phys_rra_alloc_order(slab_cache->allocator, slab_cache->order);
+      phys_rra_alloc_order(slab_cache->allocator, ilog2(slab_cache->pages));
   if (!page) {
     return;
   }
@@ -142,7 +112,9 @@ void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
     objects_start =
         page_hm + (desc_sz + element_sz - 1) / element_sz * element_sz;
   } else {
-    // Allocate descriptor.
+    // Allocate descriptor. Note that this will always allocate from the global
+    // slab_cache, not the local one if slab_cache->allocator is set to
+    // something else (for unit tests).
     slab = (struct slab *)kmalloc(desc_sz);
     objects_start = page_hm;
   }
@@ -152,9 +124,8 @@ void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
     return;
   }
 
-  // Initialize slab ll.
-  slab->prev = NULL;
-  slab->next = NULL;
+  list_init(&slab->ll);
+
   slab->data = objects_start;
 
   slab->parent = slab_cache;
@@ -171,23 +142,35 @@ void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   assert(pg_desc);
   pg_desc->context.slab = slab;
 
-  slab_cache->empty_slabs = slab;
+  list_add(&slab_cache->empty_slabs, &slab->ll);
+}
+
+void slab_destroy(struct slab *slab) {
+  // Deallocate the backing pages. For small-order slabs, this includes the
+  // descriptor -- so be careful! For large-order slabs, the descriptor is
+  // kmalloc-ed separately and still needs to be freed.
+  void *bp = _slab_cache_is_small(slab->parent->order) ? slab : slab->data;
+  phys_rra_free_order(slab->parent->allocator, VM_TO_IDM(bp),
+                      ilog2(slab->parent->pages));
+
+  // Remove this slab from the parent ll.
+  list_del(&slab->ll);
 }
 
 struct slab *slab_cache_find_nonfull_slab(struct slab_cache *slab_cache) {
   // Look for partially-full slabs first.
-  if (slab_cache->partial_slabs) {
-    return slab_cache->partial_slabs;
+  if (!list_empty(&slab_cache->partial_slabs)) {
+    return list_entry(slab_cache->partial_slabs.next, struct slab, ll);
   }
 
   // Look for empty slabs next.
-  if (slab_cache->empty_slabs) {
-    return slab_cache->empty_slabs;
+  if (!list_empty(&slab_cache->empty_slabs)) {
+    return list_entry(slab_cache->empty_slabs.next, struct slab, ll);
   }
 
   // Need to allocate a new slab.
   slab_cache_alloc_slab(slab_cache);
-  return slab_cache->empty_slabs;
+  return list_entry(slab_cache->empty_slabs.next, struct slab, ll);
 }
 
 void *slab_alloc(struct slab *slab) {
@@ -207,30 +190,26 @@ void *slab_cache_alloc(struct slab_cache *slab_cache) {
     return NULL;
   }
 
-  bool is_slab_orig_empty = !!slab->allocated;
+  bool is_slab_orig_empty = !slab->allocated;
 
   // Perform allocation.
   void *obj = slab_alloc(slab);
 
   if (slab->allocated == slab->parent->elements) {
     // Move to full list.
-    slab_cache->full_slabs = _slab_move_to_ll(slab, slab_cache->full_slabs);
+    list_del(&slab->ll);
+    list_add(&slab_cache->full_slabs, &slab->ll);
   } else if (is_slab_orig_empty) {
     // Move to partially-full list.
-    slab_cache->partial_slabs =
-        _slab_move_to_ll(slab, slab_cache->partial_slabs);
+    list_del(&slab->ll);
+    list_add(&slab_cache->partial_slabs, &slab->ll);
   }
 
   return obj;
 }
 
 void *kmalloc(size_t sz) {
-  // TODO(jlam55555): Write a function for ilog2 using bsr.
-  int order = -1;
-  while (sz) {
-    sz >>= 1;
-    ++order;
-  }
+  int order = ilog2ceil(sz);
 
   if (order < SLAB_MIN_ORDER) {
     order = SLAB_MIN_ORDER;
@@ -275,21 +254,30 @@ void slab_free(struct slab *slab, const void *obj) {
   slab->freelist[slab->freelist[i].stack_item].pos_in_stk = i;
 }
 
-void slab_cache_free(struct slab *slab, const void *obj) {
-  struct slab_cache *const slab_cache = slab->parent;
+void slab_cache_free(struct slab_cache *slab_cache, struct slab *slab,
+                     const void *obj) {
+  if (!slab) {
+    struct page *pg = phys_rra_get_page(slab_cache->allocator, VM_TO_IDM(obj));
+    assert(pg);
 
-  bool is_slab_orig_full = slab->allocated == slab->parent->elements;
+    slab = pg->context.slab;
+    assert(slab);
+    assert(slab->parent == slab_cache);
+  }
+
+  bool is_slab_orig_full = slab->allocated == slab_cache->elements;
 
   // Perform freeing.
   slab_free(slab, obj);
 
   if (!slab->allocated) {
     // Move to empty list.
-    slab_cache->empty_slabs = _slab_move_to_ll(slab, slab_cache->empty_slabs);
+    list_del(&slab->ll);
+    list_add(&slab_cache->empty_slabs, &slab->ll);
   } else if (is_slab_orig_full) {
     // Move to partially-full list.
-    slab_cache->partial_slabs =
-        _slab_move_to_ll(slab, slab_cache->partial_slabs);
+    list_del(&slab->ll);
+    list_add(&slab_cache->partial_slabs, &slab->ll);
   }
 }
 
@@ -300,5 +288,5 @@ void kfree(const void *obj) {
   struct slab *const slab = pg->context.slab;
   assert(slab);
 
-  slab_cache_free(slab, obj);
+  slab_cache_free(slab->parent, slab, obj);
 }

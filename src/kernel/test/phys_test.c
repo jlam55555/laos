@@ -1,8 +1,9 @@
-#include "arch/x86_64/pt.h"
-#include "limine.h"
 #include "mem/phys.h"
 
+#include "arch/x86_64/pt.h"
+#include "limine.h"
 #include "mem/slab.h"
+#include "test/phys_fixture.h"
 #include "test/test.h"
 
 /**
@@ -32,45 +33,6 @@ DEFINE_TEST(phys, alloc_free_page_multiple) {
 }
 
 /**
- * `_phys_test_create_rra()` and `_phys_test_destroy_rra()` form a test fixture
- * for a physical allocator. This depends both on the main physical allocator
- * and the slab allocator. Note that there is no underlying memory (the only
- * underlying memory is for the allocator descriptor and the page array), so
- * writing to the pages "allocated" by this test allocator is not safe.
- *
- * TODO(jlam55555): Have a more official test fixture (setup/teardown)
- * framework.
- */
-struct phys_rra *_phys_test_create_rra(void) {
-  // Allocate a backing buffer for the page array.
-  void *page_array_bb = phys_alloc_page();
-  assert(page_array_bb);
-
-  const size_t base = PG_SZ;
-  const size_t length = 16 * PG_SZ;
-  struct limine_memmap_entry mmap_entries[] = {
-      {.base = base, .length = length, .type = LIMINE_MEMMAP_USABLE},
-  };
-  const size_t entry_count = sizeof(mmap_entries) / sizeof(mmap_entries[0]);
-
-  struct phys_rra *rra = kmalloc(sizeof(struct phys_rra));
-  phys_rra_init(rra, VM_TO_IDM(page_array_bb), base + length, mmap_entries,
-                entry_count);
-
-  return rra;
-}
-
-void _phys_test_destroy_rra(struct phys_rra *rra) {
-  assert(rra);
-
-  // Deallocate page array backing buffer.
-  phys_free_page(rra->mem_bitmap);
-
-  // Deallocate RR page allocator descriptor.
-  kfree(rra);
-}
-
-/**
  * Check if two regions overlap. See https://stackoverflow.com/a/3269471.
  */
 bool _phys_test_overlaps(void *start1, size_t len1, void *start2, size_t len2) {
@@ -89,18 +51,18 @@ bool _phys_test_overlaps(void *start1, size_t len1, void *start2, size_t len2) {
   TEST_ASSERT_NOVERLAP2(c, c_sz, d, d_sz)
 
 DEFINE_TEST(phys, rra_alloc) {
-  struct phys_rra *rra = _phys_test_create_rra();
+  struct phys_rra *rra = phys_fixture_create_rra();
   TEST_ASSERT(rra);
 
   void *pg = phys_rra_alloc_order(rra, 0);
   TEST_ASSERT(pg);
   phys_rra_free_order(rra, pg, 0);
 
-  _phys_test_destroy_rra(rra);
+  phys_fixture_destroy_rra(rra);
 }
 
 DEFINE_TEST(phys, rra_alloc_multiple) {
-  struct phys_rra *rra = _phys_test_create_rra();
+  struct phys_rra *rra = phys_fixture_create_rra();
   TEST_ASSERT(rra);
 
   void *pg1 = phys_rra_alloc_order(rra, 0);
@@ -121,11 +83,11 @@ DEFINE_TEST(phys, rra_alloc_multiple) {
   phys_rra_free_order(rra, pg2, 0);
   phys_rra_free_order(rra, pg3, 0);
 
-  _phys_test_destroy_rra(rra);
+  phys_fixture_destroy_rra(rra);
 }
 
 DEFINE_TEST(phys, rra_alloc_nonzero_order) {
-  struct phys_rra *rra = _phys_test_create_rra();
+  struct phys_rra *rra = phys_fixture_create_rra();
   TEST_ASSERT(rra);
 
   void *pg1 = phys_rra_alloc_order(rra, 1);
@@ -148,7 +110,7 @@ DEFINE_TEST(phys, rra_alloc_nonzero_order) {
   TEST_ASSERT_NOVERLAP4(pg1, 2 * PG_SZ, pg2, 4 * PG_SZ, pg3, 8 * PG_SZ, pg4,
                         PG_SZ);
 
-  _phys_test_destroy_rra(rra);
+  phys_fixture_destroy_rra(rra);
 }
 
 #undef TEST_ASSERT_NOVERLAP2
@@ -156,7 +118,7 @@ DEFINE_TEST(phys, rra_alloc_nonzero_order) {
 #undef TEST_ASSERT_NOVERLAP4
 
 DEFINE_TEST(phys, rra_alloc_oom_order0) {
-  struct phys_rra *rra = _phys_test_create_rra();
+  struct phys_rra *rra = phys_fixture_create_rra();
   TEST_ASSERT(rra);
 
   void *pg;
@@ -174,11 +136,11 @@ DEFINE_TEST(phys, rra_alloc_oom_order0) {
   TEST_ASSERT(!phys_rra_alloc_order(rra, 0));
 
   // Ok not to clean up here, since the rra will be destroyed.
-  _phys_test_destroy_rra(rra);
+  phys_fixture_destroy_rra(rra);
 }
 
 DEFINE_TEST(phys, rra_alloc_oom_order1) {
-  struct phys_rra *rra = _phys_test_create_rra();
+  struct phys_rra *rra = phys_fixture_create_rra();
   TEST_ASSERT(rra);
 
   const size_t order = 1;
@@ -198,11 +160,11 @@ DEFINE_TEST(phys, rra_alloc_oom_order1) {
   TEST_ASSERT(!phys_rra_alloc_order(rra, order));
 
   // Ok not to clean up here, since the rra will be destroyed.
-  _phys_test_destroy_rra(rra);
+  phys_fixture_destroy_rra(rra);
 }
 
 DEFINE_TEST(phys, rra_alloc_oom_order4) {
-  struct phys_rra *rra = _phys_test_create_rra();
+  struct phys_rra *rra = phys_fixture_create_rra();
   TEST_ASSERT(rra);
 
   const size_t order = 4;
@@ -222,7 +184,7 @@ DEFINE_TEST(phys, rra_alloc_oom_order4) {
   TEST_ASSERT(!phys_rra_alloc_order(rra, order));
 
   // Ok not to clean up here, since the rra will be destroyed.
-  _phys_test_destroy_rra(rra);
+  phys_fixture_destroy_rra(rra);
 }
 
 /**
@@ -230,7 +192,7 @@ DEFINE_TEST(phys, rra_alloc_oom_order4) {
  * smaller ones can. The setup is somewhat implementation-dependent.
  */
 DEFINE_TEST(phys, rra_alloc_oom_no_contiguous) {
-  struct phys_rra *rra = _phys_test_create_rra();
+  struct phys_rra *rra = phys_fixture_create_rra();
   TEST_ASSERT(rra);
 
   void *pg1, *pg2, *pg3;
@@ -268,11 +230,11 @@ DEFINE_TEST(phys, rra_alloc_oom_no_contiguous) {
   TEST_ASSERT(phys_rra_alloc_order(rra, 1));
 
   // Ok not to clean up here, since the rra will be destroyed.
-  _phys_test_destroy_rra(rra);
+  phys_fixture_destroy_rra(rra);
 }
 
 DEFINE_TEST(phys, struct_page_props) {
-  struct phys_rra *rra = _phys_test_create_rra();
+  struct phys_rra *rra = phys_fixture_create_rra();
   TEST_ASSERT(rra);
 
   void *pg;
@@ -290,5 +252,28 @@ DEFINE_TEST(phys, struct_page_props) {
   TEST_ASSERT(!struct_pg->present);
 
   // Ok not to clean up here, since the rra will be destroyed.
-  _phys_test_destroy_rra(rra);
+  phys_fixture_destroy_rra(rra);
+}
+
+/**
+ * Ensure that we can R/W the allocated pages.
+ */
+DEFINE_TEST(phys, page_rw) {
+  struct phys_rra *rra = phys_fixture_create_rra();
+  TEST_ASSERT(rra);
+
+  void *pg;
+  TEST_ASSERT(pg = phys_rra_alloc_order(rra, 1));
+
+  uint8_t *arr = VM_TO_HHDM(pg);
+  for (size_t i = 0; i < 4096; ++i) {
+    arr[i] = i % 256;
+  }
+
+  for (size_t i = 0; i < 4096; ++i) {
+    TEST_ASSERT(arr[i] == i % 256);
+  }
+
+  // Ok not to clean up here, since the rra will be destroyed.
+  phys_fixture_destroy_rra(rra);
 }

@@ -59,7 +59,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "mem/phys.h" // struct phys_rra
+#include "common/list.h" // struct list_head
+#include "mem/phys.h"    // struct phys_rra
 
 #define SLAB_MIN_ORDER 4
 #define SLAB_MAX_ORDER 16
@@ -73,13 +74,13 @@
  * was allocated using a lower-order slab allocator (for large-order slabs).
  */
 struct slab {
-  // TODO(jlam55555): Implement `struct list_head`.
   struct slab *next;         // 8
   struct slab *prev;         // 8
   struct slab_cache *parent; // 8
   void *data;                // 8
-
-  uint8_t allocated; // 1
+  struct list_head ll;       // 16
+  uint8_t allocated;         // 1
+  uint64_t : 56;             // 7
 
   // This must come last.
   struct slab_freelist_item {
@@ -90,7 +91,14 @@ struct slab {
     // the slab. Used for deallocations.
     uint8_t pos_in_stk;
   } freelist[0];
-} __attribute__((packed));
+};
+
+/**
+ * Ensure that slab_freelist_item is at the end of the `struct_slab`, without
+ * requiring `__attribute__((packed))`. This is to prevent gcc from complaining
+ * about bad alignment.
+ */
+_Static_assert(sizeof(struct slab) == 56);
 
 /**
  * Slab allocator for a particular order. Maintains a cache of `struct slab`s
@@ -106,12 +114,14 @@ struct slab_cache {
   // slabs. (Always 0 for large-order slabs.)
   uint16_t offset; // 2
 
-  struct slab *empty_slabs;   // 8
-  struct slab *partial_slabs; // 8
-  struct slab *full_slabs;    // 8
-
   // Physical page allocator.
   struct phys_rra *allocator; // 8
+
+  // Sentinel nodes for slab freelists. (Note that these are packed structs, so
+  // the alignment may be a bit strange).
+  struct list_head empty_slabs;
+  struct list_head partial_slabs;
+  struct list_head full_slabs;
 };
 
 /**
@@ -160,10 +170,21 @@ void slab_cache_init(struct slab_cache *slab_cache, struct phys_rra *rra,
                      unsigned order);
 
 /**
+ * Clean up a slab cache. This means cleaning up all slabs associated with this
+ * slab cache.
+ */
+void slab_cache_destroy(struct slab_cache *slab_cache);
+
+/**
  * Allocate a new slab for the provided slab cache, and add the new slab to the
  * slab cache's empty list.
  */
 void slab_cache_alloc_slab(struct slab_cache *slab_cache);
+
+/**
+ * Clean up a slab. This means freeing the backing page.
+ */
+void slab_destroy(struct slab *slab);
 
 /**
  * Find a non-full slab in a slab cache. First check the empty list, then the
@@ -193,11 +214,12 @@ void slab_free(struct slab *slab, const void *obj);
 /**
  * Frees the object from the parent slab cache.
  *
- * This function may be a little confusingly-named, because it appears to have
- * the same argument set as the `slab_free()` function above. This is just a
- * wrapper around it which does some handling on the parent `struct slab_cache`
- * -- there's no reason it can't be combined with that function.
+ * The signature may look a little strange. The reason for supplying both
+ * `slab_cache` and `slab` is that we may know the slab in the process of
+ * finding the slab_cache when freeing an object. If the slab is provided (not
+ * NULL), it'll be used; otherwise, it'll be looked up from the `struct page`.
  */
-void slab_cache_free(struct slab *slab, const void *obj);
+void slab_cache_free(struct slab_cache *slab_cache, struct slab *slab,
+                     const void *obj);
 
 #endif // MEM_SLAB_H

@@ -82,6 +82,9 @@ endif
 # Use DEBUG=i for the `run_hdd`/`run_iso` targets if you want to run with
 # interactive debugging (`run_gdb`). Make sure to use the same variant flags
 # so that the correct image variant is targeted.
+#
+# TODO(jlam55555): Need to allow debugging w/o optimizations. This is failing
+# because of static fn defs in headers I think. Not sure exactly why.
 ifneq ($(DEBUG),)
     override CFLAGS += -DDEBUG -g -save-temps=obj
     override NASMFLAGS += -DDEBUG -g

@@ -47,10 +47,29 @@ inline uint8_t inb(uint16_t port) {
 #define JOIN7(delim, a, ...) a delim JOIN6(delim, __VA_ARGS__)
 #define JOIN8(delim, a, ...) a delim JOIN7(delim, __VA_ARGS__)
 
-/** Stringify a macro. E.g., one that comes from a -Dmacro=xyz gcc arg.
+/**
+ * Stringify a macro. E.g., one that comes from a -Dmacro=xyz gcc arg.
  * https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html
  */
 #define _macro2str(macro...) #macro
 #define macro2str(macro) _macro2str(macro)
+
+/**
+ * ilog2(n) = floor(log_2(n))
+ */
+static inline int ilog2(uint32_t n) {
+  signed rv;
+  if (!n) {
+    return -1;
+  }
+  __asm__("bsr %1, %0" : "=r"(rv) : "r"(n));
+  return rv;
+}
+
+/**
+ * ilog2ceil(n) = ceil(log_2(n)). Example usage: rounding to the next higher
+ * power of two, but you want to get the exponent.
+ */
+static inline int ilog2ceil(uint32_t n) { return n ? ilog2(n - 1) + 1 : -1; }
 
 #endif // COMMON_UTIL_H
