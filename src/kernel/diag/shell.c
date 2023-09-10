@@ -43,7 +43,7 @@ void _shell_dispatch(const char *cmd) {
     phys_mem_print_stats();
   } else if (!strncmp(cmd, "pa", SHELL_INPUT_BUF_SZ)) {
     // Allocate a random page. For testing purposes.
-    printf("\rret=%lx\r\n", phys_page_alloc());
+    printf("\rret=%lx\r\n", phys_alloc_page());
   } else if (!strncmp(cmd, "rt", strlen("rt"))) {
     // Get argument 2. Need to write a vector-like library.
     // TODO(jlam55555): This is pretty unsafe.

@@ -16,7 +16,10 @@
  * This will generate tests named "ns1.foo" and "ns2.bar", respectively.
  *
  * For unit tests of internal/private functions, define the tests in the same
- * file as the functions to test.
+ * file as the functions to test. In general, try to only test public
+ * interfaces. If a private interface is so complex that you feel that you want
+ * to unit test, it should probably be made public (even if it is only used in
+ * one place, because it might be reused in the future).
  *
  * Automatic test discovery based on:
  * https://gist.github.com/nickrolfe/ffc9b1c02381b9dc17c975b98db42172
@@ -88,10 +91,13 @@ struct test_info {
 #define DEFINE_TEST(ns, test) _define_test(ns##__##test, #ns "." #test)
 
 /**
- * Run all tests, or run tests with the given name.
- *
- * TODO(jlam55555): Determine how to specify tests.
+ * Run all tests, or run tests that match the selection pattern.
  */
 void run_tests(const char *selection);
+
+/**
+ * Test pattern matcher.
+ */
+bool test_matches(const struct test_info *test, const char *selection);
 
 #endif // TEST_TEST_H

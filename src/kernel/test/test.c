@@ -14,8 +14,8 @@ const struct test_info *const tests_end = &__stop_test_rodata;
 // disjunctive selection.
 //
 // Assumes there are no disjunctions (no ',') in the pattern.
-bool _test_is_match_single(const struct test_info *test, const char *selection,
-                           size_t selection_len) {
+bool _test_matches_single(const struct test_info *test, const char *selection,
+                          size_t selection_len) {
   // Empty selection matches all patterns.
   if (!selection_len) {
     return true;
@@ -54,7 +54,7 @@ bool _test_is_match_single(const struct test_info *test, const char *selection,
   return false;
 }
 
-bool _test_is_match(const struct test_info *test, const char *selection) {
+bool test_matches(const struct test_info *test, const char *selection) {
   assert(selection);
   const size_t n = strlen(selection);
 
@@ -65,12 +65,12 @@ bool _test_is_match(const struct test_info *test, const char *selection) {
   // TODO(jlam55555): Rewrite this iteratively with `strtok()`.
   for (size_t i = 0; i < n; ++i) {
     if (selection[i] == ',') {
-      return _test_is_match_single(test, selection, i) ||
-             _test_is_match(test, selection + i + 1);
+      return _test_matches_single(test, selection, i) ||
+             test_matches(test, selection + i + 1);
     }
   }
 
-  return _test_is_match_single(test, selection, n);
+  return _test_matches_single(test, selection, n);
 }
 
 // Run all tests.
@@ -82,7 +82,7 @@ void run_tests(const char *selection) {
 
   unsigned tests_collected = 0, tests_passed = 0;
   for (const struct test_info *test = tests_begin; test < tests_end; ++test) {
-    if (!_test_is_match(test, selection)) {
+    if (!test_matches(test, selection)) {
       continue;
     }
 
@@ -104,95 +104,4 @@ void run_tests(const char *selection) {
 #ifdef RUNTEST
   acpi_shutdown();
 #endif // RUNTEST
-}
-
-DEFINE_TEST(test, pattern_matcher) {
-  const char *pat1 = "test.";
-  const char *pat2 = "";
-  const char *pat3 = "^test.";
-  const char *pat4 = "pattern_matcher";
-  const char *pat5 = "pattern_matcher$";
-  const char *pat6 = "test.pattern_matcher$";
-  const char *pat7 = "^test.pattern_matcher$";
-  const char *pat8 = "^test.pattern_matcher";
-  const char *pat9 = "^1test.pattern_matcher";
-  const char *pat10 = "^test.pattern_matcher1";
-  const char *pat11 = "test.pattern_matcher1$";
-  const char *pat12 = "test.pattern_matcher1";
-  const char *pat13 = ".";
-  const char *pat14 = "match";
-
-  const struct test_info test1 = {.name = "test.pattern_matcher"};
-
-  TEST_ASSERT(_test_is_match(&test1, pat1));
-  TEST_ASSERT(_test_is_match(&test1, pat2));
-  TEST_ASSERT(_test_is_match(&test1, pat3));
-  TEST_ASSERT(_test_is_match(&test1, pat4));
-  TEST_ASSERT(_test_is_match(&test1, pat5));
-  TEST_ASSERT(_test_is_match(&test1, pat6));
-  TEST_ASSERT(_test_is_match(&test1, pat7));
-  TEST_ASSERT(_test_is_match(&test1, pat8));
-  TEST_ASSERT(!_test_is_match(&test1, pat9));
-  TEST_ASSERT(!_test_is_match(&test1, pat10));
-  TEST_ASSERT(!_test_is_match(&test1, pat11));
-  TEST_ASSERT(!_test_is_match(&test1, pat12));
-  TEST_ASSERT(_test_is_match(&test1, pat13));
-  TEST_ASSERT(_test_is_match(&test1, pat14));
-
-  const struct test_info test2 = {.name = "test.foo"};
-
-  TEST_ASSERT(_test_is_match(&test2, pat1));
-  TEST_ASSERT(_test_is_match(&test2, pat2));
-  TEST_ASSERT(_test_is_match(&test2, pat3));
-  TEST_ASSERT(!_test_is_match(&test2, pat4));
-  TEST_ASSERT(!_test_is_match(&test2, pat5));
-  TEST_ASSERT(!_test_is_match(&test2, pat6));
-  TEST_ASSERT(!_test_is_match(&test2, pat7));
-  TEST_ASSERT(!_test_is_match(&test2, pat8));
-  TEST_ASSERT(!_test_is_match(&test2, pat9));
-  TEST_ASSERT(!_test_is_match(&test2, pat10));
-  TEST_ASSERT(!_test_is_match(&test2, pat11));
-  TEST_ASSERT(!_test_is_match(&test2, pat12));
-  TEST_ASSERT(_test_is_match(&test2, pat13));
-  TEST_ASSERT(!_test_is_match(&test2, pat14));
-
-  const struct test_info test3 = {.name = "bar.hello"};
-
-  TEST_ASSERT(!_test_is_match(&test3, pat1));
-  TEST_ASSERT(_test_is_match(&test3, pat2));
-  TEST_ASSERT(!_test_is_match(&test3, pat3));
-}
-
-DEFINE_TEST(test, disjunctive_simple_patterns) {
-  const char *pat1 = "foo";
-  const char *pat2 = "bar";
-  const char *pat3 = "foo,bar";
-
-  const struct test_info test1 = {.name = "foo"};
-  const struct test_info test2 = {.name = "bar"};
-
-  TEST_ASSERT(_test_is_match(&test1, pat1));
-  TEST_ASSERT(!_test_is_match(&test1, pat2));
-  TEST_ASSERT(_test_is_match(&test1, pat3));
-
-  TEST_ASSERT(!_test_is_match(&test2, pat1));
-  TEST_ASSERT(_test_is_match(&test2, pat2));
-  TEST_ASSERT(_test_is_match(&test2, pat3));
-}
-
-DEFINE_TEST(test, disjunctive_complex_patterns) {
-  const char *pat1 = "^foo.hi$";
-  const char *pat2 = "ba";
-  const char *pat3 = "^foo.hi$,ba";
-
-  const struct test_info test1 = {.name = "foo.hi"};
-  const struct test_info test2 = {.name = "bar"};
-
-  TEST_ASSERT(_test_is_match(&test1, pat1));
-  TEST_ASSERT(!_test_is_match(&test1, pat2));
-  TEST_ASSERT(_test_is_match(&test1, pat3));
-
-  TEST_ASSERT(!_test_is_match(&test2, pat1));
-  TEST_ASSERT(_test_is_match(&test2, pat2));
-  TEST_ASSERT(_test_is_match(&test2, pat3));
 }
