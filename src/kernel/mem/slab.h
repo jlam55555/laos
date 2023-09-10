@@ -49,9 +49,20 @@
  * When freeing an object, the slab that the object belongs to is noted by the
  * `struct page` for the physical page of the object memory.
  *
- * The only true external interfaces here are `kmalloc()` and `kfree()`. The
- * rest of the `slab_cache_*()` and `slab_*()` methods are mainly exposed for
- * unit testing.
+ * Design-wise, there are three levels of abstraction (most to least abstract):
+ *
+ * 1. `kmalloc()`/`kfree()`
+ * 2. `slab_cache_alloc()`/`slab_cache_free()`
+ * 3. `_slab_alloc()`/`_slab_free()`
+ *
+ * The innermost layer is considered an implementation detail. Unit testing is
+ * only done on the first two levels, which should fully exercise the
+ * `_slab_*()` methods. `kmalloc()`/`kfree()` should be sufficient for most use
+ * cases unless a custom slab allocator is needed.
+ *
+ * TODO(jlam55555): Introduce a `slab_cache_purge()` method that purges unused
+ * slabs in the slablists. This will only be needed for low-memory situations so
+ * it's not something we need to worry about in usual operation.
  */
 #ifndef MEM_SLAB_H
 #define MEM_SLAB_H
@@ -68,37 +79,9 @@
 #define SLAB_LARGE_MIN_ORDER (SLAB_SMALL_MAX_ORDER + 1)
 
 /**
- * Slab descriptor. This is stored one of the linked-lists in a struct
- * slab_cache allocator. The slab descriptor physically either resides at the
- * beginning of the physical backing page of the slab (for small-order slabs) or
- * was allocated using a lower-order slab allocator (for large-order slabs).
+ * See comment in slab.c.
  */
-struct slab {
-  struct slab *next;         // 8
-  struct slab *prev;         // 8
-  struct slab_cache *parent; // 8
-  void *data;                // 8
-  struct list_head ll;       // 16
-  uint8_t allocated;         // 1
-  uint64_t : 56;             // 7
-
-  // This must come last.
-  struct slab_freelist_item {
-    // freelist[i].stack_item gets the i-th index on the stack. Used for
-    // allocations.
-    uint8_t stack_item;
-    // freelist[i].pos_in_stk gets the index in the stack of the i-th object in
-    // the slab. Used for deallocations.
-    uint8_t pos_in_stk;
-  } freelist[0];
-};
-
-/**
- * Ensure that slab_freelist_item is at the end of the `struct_slab`, without
- * requiring `__attribute__((packed))`. This is to prevent gcc from complaining
- * about bad alignment.
- */
-_Static_assert(sizeof(struct slab) == 56);
+struct slab;
 
 /**
  * Slab allocator for a particular order. Maintains a cache of `struct slab`s
@@ -182,34 +165,9 @@ void slab_cache_destroy(struct slab_cache *slab_cache);
 void slab_cache_alloc_slab(struct slab_cache *slab_cache);
 
 /**
- * Clean up a slab. This means freeing the backing page.
- */
-void slab_destroy(struct slab *slab);
-
-/**
- * Find a non-full slab in a slab cache. First check the empty list, then the
- * partially-full list. If no slabs exist, then allocate a new slab.
- */
-struct slab *slab_cache_find_nonfull_slab(struct slab_cache *slab_cache);
-
-/**
- * Allocate an object within a slab. O(1) runtime, and returns the last-freed
- * element (if any).
- */
-void *slab_alloc(struct slab *slab);
-
-/**
  * Allocate an object within a slab cache. O(1) runtime.
  */
 void *slab_cache_alloc(struct slab_cache *slab_cache);
-
-/**
- * Frees the object within the slab.
- *
- * Currently doesn't perform any bounds checking. This shouldn't be called
- * directly except from `slab_cache_free()` and in unit tests.
- */
-void slab_free(struct slab *slab, const void *obj);
 
 /**
  * Frees the object from the parent slab cache.

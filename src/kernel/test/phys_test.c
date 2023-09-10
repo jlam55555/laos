@@ -32,24 +32,6 @@ DEFINE_TEST(phys, alloc_free_page_multiple) {
   phys_free_page(pg3);
 }
 
-/**
- * Check if two regions overlap. See https://stackoverflow.com/a/3269471.
- */
-bool _phys_test_overlaps(void *start1, size_t len1, void *start2, size_t len2) {
-  return start1 < (start2 + len2) && start2 < (start1 + len1);
-}
-#define TEST_ASSERT_NOVERLAP2(a, a_sz, b, b_sz)                                \
-  TEST_ASSERT(!_phys_test_overlaps(a, a_sz, b, b_sz))
-#define TEST_ASSERT_NOVERLAP3(a, a_sz, b, b_sz, c, c_sz)                       \
-  TEST_ASSERT_NOVERLAP2(a, a_sz, b, b_sz);                                     \
-  TEST_ASSERT_NOVERLAP2(a, a_sz, c, c_sz);                                     \
-  TEST_ASSERT_NOVERLAP2(b, b_sz, c, c_sz)
-#define TEST_ASSERT_NOVERLAP4(a, a_sz, b, b_sz, c, c_sz, d, d_sz)              \
-  TEST_ASSERT_NOVERLAP3(a, a_sz, b, b_sz, c, c_sz);                            \
-  TEST_ASSERT_NOVERLAP2(a, a_sz, d, d_sz);                                     \
-  TEST_ASSERT_NOVERLAP2(b, b_sz, d, d_sz);                                     \
-  TEST_ASSERT_NOVERLAP2(c, c_sz, d, d_sz)
-
 DEFINE_TEST(phys, rra_alloc) {
   struct phys_rra *rra = phys_fixture_create_rra();
   TEST_ASSERT(rra);
@@ -112,10 +94,6 @@ DEFINE_TEST(phys, rra_alloc_nonzero_order) {
 
   phys_fixture_destroy_rra(rra);
 }
-
-#undef TEST_ASSERT_NOVERLAP2
-#undef TEST_ASSERT_NOVERLAP3
-#undef TEST_ASSERT_NOVERLAP4
 
 DEFINE_TEST(phys, rra_alloc_oom_order0) {
   struct phys_rra *rra = phys_fixture_create_rra();

@@ -117,14 +117,18 @@ void *phys_alloc_page(void) {
 }
 
 void phys_free_page(const void *pg) {
-  assert(phys_rra_free(&_phys_allocator, VM_TO_IDM(pg)));
+  phys_rra_free_order(&_phys_allocator, VM_TO_IDM(pg), 0);
 }
 
 struct phys_rra *phys_mem_get_rra(void) {
   return &_phys_allocator;
 }
-
-bool phys_rra_alloc(struct phys_rra *rra, const void *addr) {
+/**
+ * Allocates a physical page. Errors if the page is unusable (e.g., hole
+ * memory). Returns true iff the physical page is free.
+ */
+bool _phys_rra_alloc(struct phys_rra *rra, const void *addr) {
+  assert(addr);
   const size_t pg = (size_t)(addr - rra->phys_offset) >> PG_SZ_BITS;
   assert(pg < rra->total_pg);
   assert(!rra->mem_bitmap[pg].unusable);
@@ -137,7 +141,12 @@ bool phys_rra_alloc(struct phys_rra *rra, const void *addr) {
   return true;
 }
 
-bool phys_rra_free(struct phys_rra *rra, const void *addr) {
+/**
+ * Frees a physical page. Errors if the page is unusable (e.g., hole memory).
+ * Returns true iff the physical page is allocated.
+ */
+bool _phys_rra_free(struct phys_rra *rra, const void *addr) {
+  assert(addr);
   assert(PG_ALIGNED(addr));
   const size_t pg = (size_t)(addr - rra->phys_offset) >> PG_SZ_BITS;
   assert(!rra->mem_bitmap[pg].unusable);
@@ -169,7 +178,7 @@ static void _phys_rra_alloc_region(struct phys_rra *rra, void *addr,
       assert(!rra->mem_bitmap[pg].present);
       rra->mem_bitmap[pg].unusable = true;
     } else {
-      assert(phys_rra_alloc(rra, addr));
+      assert(_phys_rra_alloc(rra, addr));
     }
   }
   // Adjust unusable page counts.
@@ -195,6 +204,7 @@ void phys_rra_init(struct phys_rra *rra, void *addr, size_t mem_limit,
   rra->total_sz = mem_limit;
   rra->total_pg = mem_limit >> PG_SZ_BITS;
   rra->allocated_pg = 0;
+  rra->unusable_pg = 0;
   rra->needle = 0;
   rra->phys_offset = phys_offset;
 
@@ -297,11 +307,13 @@ void *phys_rra_alloc_order(struct phys_rra *rra, unsigned order) {
 void phys_rra_free_order(struct phys_rra *rra, const void *pg, unsigned order) {
   const size_t pages = 1u << order;
   for (unsigned i = 0; i < pages; ++i, pg += PG_SZ) {
-    assert(phys_rra_free(rra, pg));
+    assert(_phys_rra_free(rra, pg));
   }
 }
 
 struct page *phys_rra_get_page(struct phys_rra *rra, const void *pg) {
-  pg -= (uint64_t)rra->phys_offset;
+  if (pg) {
+    pg -= (uint64_t)rra->phys_offset;
+  }
   return &rra->mem_bitmap[(size_t)pg >> PG_SZ_BITS];
 }

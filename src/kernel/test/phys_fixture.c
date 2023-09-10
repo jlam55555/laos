@@ -53,7 +53,8 @@ struct slab_cache *slab_fixture_create_slab_cache(unsigned order) {
 }
 
 void slab_fixture_destroy_slab_cache(struct slab_cache *slab_cache) {
-  phys_fixture_destroy_rra(slab_cache->allocator);
+  struct phys_rra *rra = slab_cache->allocator;
   slab_cache_destroy(slab_cache);
+  phys_fixture_destroy_rra(rra);
   kfree(slab_cache);
 }

@@ -13,6 +13,7 @@
 
 #include "test/phys_fixture.h"
 #include "test/test.h"
+#include <stdint.h>
 
 /**
  * Like PG_ALIGNED, but for an arbitrary power-of-two sz. This macro also checks
@@ -106,16 +107,16 @@ DEFINE_TEST(slab, kmalloc_last_freed_realloc) {
 }
 
 /**
- * Test `slab_{alloc,free}()`.
+ * Test `slab_cache_{alloc,free}()`.
  */
-DEFINE_TEST(slab, alloc) {
+DEFINE_TEST(slab, cache_alloc) {
   struct slab_cache *cache;
   TEST_ASSERT(cache = slab_fixture_create_slab_cache(8));
 
-  void *v;
-  TEST_ASSERT(v = slab_cache_alloc(cache));
+  void *obj;
+  TEST_ASSERT(obj = slab_cache_alloc(cache));
 
-  slab_cache_free(cache, NULL, v);
+  slab_cache_free(cache, NULL, obj);
 
   slab_fixture_destroy_slab_cache(cache);
 }
@@ -123,12 +124,57 @@ DEFINE_TEST(slab, alloc) {
 /**
  * Test allocs out of order.
  */
-DEFINE_TEST(slab, alloc_multiple) { TEST_ASSERT(false); }
+DEFINE_TEST(slab, cache_alloc_multiple) {
+  struct slab_cache *cache;
+  TEST_ASSERT(cache = slab_fixture_create_slab_cache(8));
+
+  void *obj1, *obj2, *obj3, *obj4, *obj5, *obj6, *obj7, *obj8;
+  TEST_ASSERT(obj1 = slab_cache_alloc(cache));
+  TEST_ASSERT(obj2 = slab_cache_alloc(cache));
+  TEST_ASSERT(obj3 = slab_cache_alloc(cache));
+
+  slab_cache_free(cache, NULL, obj2);
+  slab_cache_free(cache, NULL, obj3);
+
+  TEST_ASSERT(obj4 = slab_cache_alloc(cache));
+  TEST_ASSERT(obj5 = slab_cache_alloc(cache));
+  TEST_ASSERT(obj6 = slab_cache_alloc(cache));
+
+  slab_cache_free(cache, NULL, obj1);
+  slab_cache_free(cache, NULL, obj6);
+  slab_cache_free(cache, NULL, obj4);
+
+  TEST_ASSERT(obj7 = slab_cache_alloc(cache));
+  TEST_ASSERT(obj8 = slab_cache_alloc(cache));
+
+  slab_cache_free(cache, NULL, obj7);
+  slab_cache_free(cache, NULL, obj5);
+  slab_cache_free(cache, NULL, obj8);
+
+  slab_fixture_destroy_slab_cache(cache);
+}
 
 /**
- * Make sure slab-allocated memory is R/W-able.
+ * Test that adjacent allocations aren't overlapping.
  */
-DEFINE_TEST(slab, alloc_rwable) { TEST_ASSERT(false); }
+DEFINE_TEST(slab, cache_alloc_noverlap) {
+  struct slab_cache *cache;
+  TEST_ASSERT(cache = slab_fixture_create_slab_cache(8));
+
+  // This should fill up a complete slab. 256*16=4096. It's not _too_ important
+  // if this actually overflows onto another slab.
+  void *objs[16];
+  for (unsigned i = 0; i < 16; ++i) {
+    TEST_ASSERT(objs[i] = slab_cache_alloc(cache));
+  }
+
+  for (unsigned i = 0; i < 16; ++i) {
+    TEST_ASSERT_NOVERLAP2(objs[i], 256, objs[(i + 1) % 16], 256);
+  }
+
+  // Don't need to explicitly free here, destroying the slabs should cleanup.
+  slab_fixture_destroy_slab_cache(cache);
+}
 
 /**
  * Make sure slab-allocated memory persists between allocs/frees. I.e., this
@@ -139,23 +185,104 @@ DEFINE_TEST(slab, alloc_rwable) { TEST_ASSERT(false); }
  * which is tested in test "slab.kmalloc_last_freed_realloc".
  */
 DEFINE_TEST(slab, remains_initialized_after_free_alloc_cycle) {
-  TEST_ASSERT(false);
-}
+  struct slab_cache *cache;
+  TEST_ASSERT(cache = slab_fixture_create_slab_cache(4));
 
-/**
- * Test `slab_cache_{alloc,free}()`.
- */
-DEFINE_TEST(slab, cache_alloc) { TEST_ASSERT(false); }
+  // This may not be true if we change SLAB_MIN_ORDER, so beware.
+  TEST_ASSERT(cache->order == 4);
+
+  // Need an easy 16-byte type to fill the whole object.
+  struct sixteen_bytes {
+    uint64_t a, b;
+  } * obj1, *obj2;
+  _Static_assert(sizeof(*obj1) == 16);
+
+  TEST_ASSERT(obj1 = slab_cache_alloc(cache));
+
+  // Fill obj1 with all 1's.
+  obj1->a = obj1->b = ~0ULL;
+
+  slab_cache_free(cache, NULL, obj1);
+  TEST_ASSERT(obj2 = slab_cache_alloc(cache));
+  TEST_ASSERT(obj1 == obj2);
+
+  // Check that obj1 is still the same.
+  TEST_ASSERT(obj1->a == ~0ULL && obj1->b == ~0ULL);
+
+  // Now fill obj1 with all 0's (in case it was already filled with all 1's
+  // before this test began, and the above didn't actually change the value of
+  // obj1).
+  obj1->a = obj1->b = 0ULL;
+
+  slab_cache_free(cache, NULL, obj1);
+  TEST_ASSERT(obj2 = slab_cache_alloc(cache));
+  TEST_ASSERT(obj1 == obj2);
+
+  // Test that obj1 is still the same.
+  TEST_ASSERT(obj1->a == 0ULL && obj1->b == 0ULL);
+
+  slab_cache_free(cache, NULL, obj1);
+
+  slab_fixture_destroy_slab_cache(cache);
+}
 
 /**
  * Test running out of memory in the physical memory manager.
  */
-DEFINE_TEST(slab, oom) { TEST_ASSERT(false); }
+DEFINE_TEST(slab, oom) {
+  struct slab_cache *cache;
+  TEST_ASSERT(cache = slab_fixture_create_slab_cache(8));
+
+  // The test fixture is a order-8 (large order) slab on a 16-page physical page
+  // allocator. We should be able to fit 256 entries before overflow. Note that
+  // the slab descriptor for a large-order slab is allocated using `kmalloc()`
+  // and doesn't factor in here.
+  TEST_ASSERT(cache->elements == 16);
+  TEST_ASSERT(cache->allocator->total_pg - cache->allocator->unusable_pg -
+                  cache->allocator->allocated_pg ==
+              16);
+
+  void *last_alloc_obj;
+  for (size_t i = 0; i < 256; ++i) {
+    TEST_ASSERT(last_alloc_obj = slab_cache_alloc(cache));
+  }
+
+  // Should be full now, shouldn't be able to alloc again.
+  TEST_ASSERT(!slab_cache_alloc(cache));
+
+  // Free one element, should be able to alloc exactly once.
+  slab_cache_free(cache, NULL, last_alloc_obj);
+  TEST_ASSERT(slab_cache_alloc(cache));
+  TEST_ASSERT(!slab_cache_alloc(cache));
+
+  slab_fixture_destroy_slab_cache(cache);
+}
 
 /**
  * Check that no pages leak after creation, allocates/frees, and destruction.
+ *
+ * This duplicates some of the logic in
+ * `slab_fixture_{create,destroy}_slab_cache()`.
  */
-DEFINE_TEST(slab, lifecycle_leakproof) { TEST_ASSERT(false); }
+DEFINE_TEST(slab, lifecycle_leakproof) {
+  struct phys_rra *rra, rra_orig;
+  assert(rra = phys_fixture_create_rra());
+
+  // Copy the rra's statistics.
+  rra_orig = *rra;
+
+  struct slab_cache *slab_cache = kmalloc(sizeof(struct slab_cache));
+  slab_cache_init(slab_cache, rra, 8);
+
+  slab_cache_destroy(slab_cache);
+
+  TEST_ASSERT(rra_orig.total_pg == rra->total_pg);
+  TEST_ASSERT(rra_orig.allocated_pg == rra->allocated_pg);
+  TEST_ASSERT(rra_orig.unusable_pg == rra->unusable_pg);
+
+  phys_fixture_destroy_rra(slab_cache->allocator);
+  kfree(slab_cache);
+}
 
 /**
  * Test caches with different orders (and simultaneously).

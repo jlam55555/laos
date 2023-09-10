@@ -13,6 +13,9 @@
 #ifndef TEST_PHYS_FIXTURE_H
 #define TEST_PHYS_FIXTURE_H
 
+#include <stdbool.h>
+#include <stddef.h>
+
 /**
  * Returns a new RR allocator of size 16 pages. The allocator will only allocate
  * pages within the backing buffer.
@@ -26,5 +29,24 @@ void phys_fixture_destroy_rra(struct phys_rra *rra);
 
 struct slab_cache *slab_fixture_create_slab_cache(unsigned order);
 void slab_fixture_destroy_slab_cache(struct slab_cache *slab_cache);
+
+/**
+ * Check if two regions overlap. See https://stackoverflow.com/a/3269471.
+ */
+inline bool _phys_test_overlaps(void *start1, size_t len1, void *start2,
+                                size_t len2) {
+  return start1 < (start2 + len2) && start2 < (start1 + len1);
+}
+#define TEST_ASSERT_NOVERLAP2(a, a_sz, b, b_sz)                                \
+  TEST_ASSERT(!_phys_test_overlaps(a, a_sz, b, b_sz))
+#define TEST_ASSERT_NOVERLAP3(a, a_sz, b, b_sz, c, c_sz)                       \
+  TEST_ASSERT_NOVERLAP2(a, a_sz, b, b_sz);                                     \
+  TEST_ASSERT_NOVERLAP2(a, a_sz, c, c_sz);                                     \
+  TEST_ASSERT_NOVERLAP2(b, b_sz, c, c_sz)
+#define TEST_ASSERT_NOVERLAP4(a, a_sz, b, b_sz, c, c_sz, d, d_sz)              \
+  TEST_ASSERT_NOVERLAP3(a, a_sz, b, b_sz, c, c_sz);                            \
+  TEST_ASSERT_NOVERLAP2(a, a_sz, d, d_sz);                                     \
+  TEST_ASSERT_NOVERLAP2(b, b_sz, d, d_sz);                                     \
+  TEST_ASSERT_NOVERLAP2(c, c_sz, d, d_sz)
 
 #endif // TEST_PHYS_FIXTURE_H

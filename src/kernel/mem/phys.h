@@ -188,18 +188,6 @@ void phys_mem_print_stats(void);
 struct phys_rra *phys_mem_get_rra(void);
 
 /**
- * Allocates a physical page. Errors if the page is unusable (e.g., hole
- * memory). Returns true iff the physical page is free.
- */
-bool phys_rra_alloc(struct phys_rra *, const void *pg);
-
-/**
- * Frees a physical page. Errors if the page is unusable (e.g., hole memory).
- * Returns true iff the physical page is allocated.
- */
-bool phys_rra_free(struct phys_rra *, const void *pg);
-
-/**
  * Initializes a RRA. Initializes the `struct page` array using the provided
  * `init_mmap`.
  *

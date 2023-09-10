@@ -9,6 +9,42 @@
 #include <assert.h>
 
 /**
+ * Slab descriptor. This is stored one of the linked-lists in a struct
+ * slab_cache allocator. The slab descriptor physically either resides at the
+ * beginning of the physical backing page of the slab (for small-order slabs) or
+ * was allocated using a lower-order slab allocator (for large-order slabs).
+ *
+ * This is exposed as an opaque type (hence why this isn't named `struct
+ * _slab`). The slab allocator exposes `kmalloc()`/`kfree()` and operations on
+ * `struct slab_cache`s, but not on `struct slab`s directly. This is considered
+ * an implementation detail.
+ */
+struct slab {
+  struct slab_cache *parent; // 8
+  void *data;                // 8
+  struct list_head ll;       // 16
+  uint8_t allocated;         // 1
+  uint64_t : 56;             // 7
+
+  // This must come last.
+  struct slab_freelist_item {
+    // freelist[i].stack_item gets the i-th index on the stack. Used for
+    // allocations.
+    uint8_t stack_item;
+    // freelist[i].pos_in_stk gets the index in the stack of the i-th object in
+    // the slab. Used for deallocations.
+    uint8_t pos_in_stk;
+  } freelist[0];
+};
+
+/**
+ * Ensure that slab_freelist_item is at the end of the `struct_slab`, without
+ * requiring `__attribute__((packed))`. This is to prevent gcc from complaining
+ * about bad alignment.
+ */
+_Static_assert(sizeof(struct slab) == 40);
+
+/**
  * Main slab caches.
  */
 struct slab_cache _slab_caches[SLAB_MAX_ORDER - SLAB_MIN_ORDER + 1];
@@ -69,11 +105,23 @@ void slab_cache_init(struct slab_cache *slab_cache, struct phys_rra *rra,
 #endif // DEBUG
 }
 
+void _slab_destroy(struct slab *slab) {
+  // Deallocate the backing pages. For small-order slabs, this includes the
+  // descriptor -- so be careful! For large-order slabs, the descriptor is
+  // kmalloc-ed separately and still needs to be freed.
+  void *bp = _slab_cache_is_small(slab->parent->order) ? slab : slab->data;
+  phys_rra_free_order(slab->parent->allocator, VM_TO_IDM(bp),
+                      ilog2(slab->parent->pages));
+
+  // Remove this slab from the parent ll.
+  list_del(&slab->ll);
+}
+
 void slab_cache_destroy(struct slab_cache *slab_cache) {
 #define CLEAR_LIST(field)                                                      \
   while (!list_empty(&slab_cache->field)) {                                    \
     struct slab *slab = list_entry(slab_cache->field.next, struct slab, ll);   \
-    slab_destroy(slab);                                                        \
+    _slab_destroy(slab);                                                       \
     if (!_slab_cache_is_small(slab_cache->order)) {                            \
       kfree(slab);                                                             \
     }                                                                          \
@@ -145,19 +193,11 @@ void slab_cache_alloc_slab(struct slab_cache *slab_cache) {
   list_add(&slab_cache->empty_slabs, &slab->ll);
 }
 
-void slab_destroy(struct slab *slab) {
-  // Deallocate the backing pages. For small-order slabs, this includes the
-  // descriptor -- so be careful! For large-order slabs, the descriptor is
-  // kmalloc-ed separately and still needs to be freed.
-  void *bp = _slab_cache_is_small(slab->parent->order) ? slab : slab->data;
-  phys_rra_free_order(slab->parent->allocator, VM_TO_IDM(bp),
-                      ilog2(slab->parent->pages));
-
-  // Remove this slab from the parent ll.
-  list_del(&slab->ll);
-}
-
-struct slab *slab_cache_find_nonfull_slab(struct slab_cache *slab_cache) {
+/**
+ * Find a non-full slab in a slab cache. First check the empty list, then the
+ * partially-full list. If no slabs exist, then allocate a new slab.
+ */
+struct slab *_slab_cache_find_nonfull_slab(struct slab_cache *slab_cache) {
   // Look for partially-full slabs first.
   if (!list_empty(&slab_cache->partial_slabs)) {
     return list_entry(slab_cache->partial_slabs.next, struct slab, ll);
@@ -170,10 +210,12 @@ struct slab *slab_cache_find_nonfull_slab(struct slab_cache *slab_cache) {
 
   // Need to allocate a new slab.
   slab_cache_alloc_slab(slab_cache);
-  return list_entry(slab_cache->empty_slabs.next, struct slab, ll);
+  return list_empty(&slab_cache->empty_slabs)
+             ? NULL
+             : list_entry(slab_cache->empty_slabs.next, struct slab, ll);
 }
 
-void *slab_alloc(struct slab *slab) {
+void *_slab_alloc(struct slab *slab) {
   assert(slab);
   assert(slab->allocated < slab->parent->elements);
 
@@ -185,7 +227,7 @@ void *slab_alloc(struct slab *slab) {
 }
 
 void *slab_cache_alloc(struct slab_cache *slab_cache) {
-  struct slab *const slab = slab_cache_find_nonfull_slab(slab_cache);
+  struct slab *const slab = _slab_cache_find_nonfull_slab(slab_cache);
   if (!slab) {
     return NULL;
   }
@@ -193,7 +235,7 @@ void *slab_cache_alloc(struct slab_cache *slab_cache) {
   bool is_slab_orig_empty = !slab->allocated;
 
   // Perform allocation.
-  void *obj = slab_alloc(slab);
+  void *obj = _slab_alloc(slab);
 
   if (slab->allocated == slab->parent->elements) {
     // Move to full list.
@@ -221,7 +263,7 @@ void *kmalloc(size_t sz) {
   return slab_cache_alloc(slab_cache);
 }
 
-void slab_free(struct slab *slab, const void *obj) {
+void _slab_free(struct slab *slab, const void *obj) {
   // Find the position of the object in the freelist.
   const size_t off = obj - slab->data;
   const unsigned order = slab->parent->order;
@@ -268,7 +310,7 @@ void slab_cache_free(struct slab_cache *slab_cache, struct slab *slab,
   bool is_slab_orig_full = slab->allocated == slab_cache->elements;
 
   // Perform freeing.
-  slab_free(slab, obj);
+  _slab_free(slab, obj);
 
   if (!slab->allocated) {
     // Move to empty list.
