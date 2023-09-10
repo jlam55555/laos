@@ -128,7 +128,6 @@ DEFINE_TEST(list, entry) {
     int val;
   } element;
 
-  // This is the real test.
   TEST_ASSERT(list_entry(&container.ll_head, struct container, ll_head) ==
               &container);
   TEST_ASSERT(list_entry(&element.ll, struct element, ll) == &element);
@@ -149,7 +148,7 @@ DEFINE_TEST(list, foreach) {
 
   TEST_ASSERT(_list_length(&ll) == 8);
 
-  // `list_foreach_const)(` doesn't currently offer an index, so this has to be
+  // `list_foreach_const()` doesn't currently offer an index, so this has to be
   // handled manually.
   int i = 0;
   list_foreach_const(&ll, it) {

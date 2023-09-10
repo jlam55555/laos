@@ -29,7 +29,9 @@ struct slab_cache *slab_fixture_create_slab_cache(unsigned order);
 void slab_fixture_destroy_slab_cache(struct slab_cache *slab_cache);
 
 /**
- * Check if two regions overlap. See https://stackoverflow.com/a/3269471.
+ * Check if two regions overlap. This does not consider intervals (1, 2) and (2,
+ * 3) to be overlapping, so use strict comparisons (<) rather than non-strict
+ * ones (<=). See https://stackoverflow.com/a/3269471.
  */
 inline bool _phys_test_overlaps(void *start1, size_t len1, void *start2,
                                 size_t len2) {

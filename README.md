@@ -20,6 +20,30 @@ sudo make run_hdd
 sudo make limine-clean clean
 ```
 
+##### More advanced usage
+```
+# Run with extra logging and debug flags.
+sudo make DEBUG=1 run_hdd
+
+# Run all tests.
+sudo make RUNTEST=all run_hdd
+
+# Run tests that match the specified pattern.
+sudo make RUNTEST=^slab.,^phys. run_hdd
+
+# Run specified tests with debug flags.
+sudo make RUNTEST
+
+# Run interactively with gdb and debug flags/logging. Run these in separate
+# terminal emulators, and make sure the variants match exactly.
+sudo make RUNTEST=^list. DEBUG=i run_hdd
+make RUNTEST=^list. DEBUG=i run_gdb
+```
+
+Each `RUNTEST` value creates a different build variant to avoid inconsistent builds. Specifying `DEBUG` also creates a different build variant. Output binaries, intermediate files, and test results will be written to `out<build_variant>/`.
+
+TODO(jlam55555): Note that headers are not correctly considered as dependencies, and the debug mode still has the `-O2` flag because there are problems building with `-O0`.
+
 ### Features
 - [X] Limine bootloader (forked to jlam55555/limine to enable VGA text mode 3 by default)
 - [X] PS/2 Keyboard driver: read scancodes, translate to keycodes/ASCII and pass to input subsystem
@@ -29,6 +53,8 @@ sudo make limine-clean clean
 - [ ] Synchronization primitives: mask interrupts/save IRQ state, spinlocks (for multicore)
 - [ ] Memory management: page fault handler, page table representation, page allocator, library functions for heap allocation
 - [ ] Processes: TODO
+
+See also [TODO.md](TODO.md).
 
 ### Learning goals
 
