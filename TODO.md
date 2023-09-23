@@ -42,3 +42,9 @@ This list will probably begin as a very generic list and become more and more fo
 - [ ] libc implementation
 - [ ] Shared library loading
 - [ ] Run ELF files
+
+### Niceties/tooling
+- [X] LSP (clangd) support
+- [ ] Doxygen
+- [ ] Also support clang build
+- [ ] More custom clang-format options
