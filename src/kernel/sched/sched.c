@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "common/list.h"
+#include "mem/phys.h"
 #include "mem/slab.h"
 
 void sched_init(struct scheduler *scheduler) {
@@ -22,20 +23,42 @@ struct sched_task *sched_create_task(struct scheduler *scheduler,
     return task;
   }
 
-  // TODO(jlam55555): Set up stack by pushing fake registers.
+  // The stack should look like we're in the middle of the sched_task_switch
+  // function.
+  //
+  // `cb` will be NULL for the bootstrap thread. We don't need to set up the
+  // stack in that case.
+  if (cb) {
+    size_t *stk = phys_alloc_page();
+    assert(stk);
+
+    // Go to the top of the page.
+    stk = (void *)stk + PG_SZ;
+
+    // Push %rip.
+    --stk;
+    *stk = (size_t)cb;
+
+    // Push %rbp, %rbx, %r12, %r13, %r14, %r15 (all garbage).
+    stk -= 6;
+
+    // Save the stack.
+    task->stk = stk;
+  }
 
   task->parent = scheduler;
   task->state = SCHED_RUNNABLE;
-  task->ip = cb;
   list_add(&scheduler->runnable, &task->ll);
   return task;
 }
 
 void sched_bootstrap_task(struct scheduler *scheduler) {
+  // `sched_create_task()` has special handling for the bootstrapping process
+  // (callback is NULL).
   struct sched_task *task = sched_create_task(scheduler, NULL);
 
-  // `sched_task_switch_nostack()` has special handling for the initial
-  // "bootstrap" call, where there is no current task.
+  // `sched_task_switch_nostack()` has special handling for the bootstrapping
+  // process (no previous running task).
   sched_task_switch_nostack(task);
 }
 
@@ -51,6 +74,8 @@ void sched_task_destroy(struct sched_task *task) {
     sched_task_switch(sched_choose_task(task->parent));
   }
 
+  // Free the stack. This assumes we didn't overflow the stack.
+  phys_free_page(PG_FLOOR(task->stk));
   kfree(task);
 }
 
@@ -63,6 +88,12 @@ struct sched_task *sched_choose_task(struct scheduler *scheduler) {
   return scheduler->current_task;
 }
 
+/**
+ * Bottom-half of the task switch mechanism. Implemented in pure asm so we don't
+ * accidentally clobber registers.
+ */
+void _sched_task_switch_stack(void *old_stk, void *new_stk);
+
 void sched_task_switch(struct sched_task *task) {
   assert(task);
   struct sched_task *old_task = task->parent->current_task;
@@ -72,14 +103,11 @@ void sched_task_switch(struct sched_task *task) {
     return;
   }
 
+  // Top-half.
   sched_task_switch_nostack(task);
 
-  // TODO(jlam55555): Save context on previous task.
-
-  // TODO(jlam55555): Restore context on new task.
-
-  // TODO(jlam55555): This is not written atomically/reentrant. Need a spinlock
-  // to protect this critical section.
+  // Bottom-half.
+  _sched_task_switch_stack(&old_task->stk, task->stk);
 }
 
 void sched_task_switch_nostack(struct sched_task *task) {

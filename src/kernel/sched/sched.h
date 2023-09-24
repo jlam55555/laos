@@ -24,7 +24,6 @@ struct scheduler {
 struct sched_task {
   struct list_head ll;
   struct scheduler *parent;
-  void *ip;
   void *stk;
   enum sched_task_state {
     SCHED_RUNNING,
