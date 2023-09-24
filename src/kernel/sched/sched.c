@@ -69,9 +69,7 @@ void sched_bootstrap_task(struct scheduler *scheduler) {
  */
 void _sched_task_switch_stack(void *old_stk, void *new_stk);
 
-void sched_task_destroy(struct sched_task *task) {
-  assert(task->parent);
-
+void sched_task_destroy_nostack(struct sched_task *task) {
   // If this is the running process, schedule away (Top half).
   struct sched_task *new_task = NULL;
   if (task->parent->current_task == task) {
@@ -90,16 +88,31 @@ void sched_task_destroy(struct sched_task *task) {
   // because of `sched_task_switch_nostack()`).
   list_del(&task->ll);
 
+#ifdef RUNTEST
+  // In testing scenarios we may not have allocated a stack.
+  if (task->stk) {
+    phys_free_page(PG_FLOOR(task->stk));
+  }
+#else
   // Free the stack. This assumes we didn't overflow the stack.
+  assert(PG_FLOOR(task->stk));
   phys_free_page(PG_FLOOR(task->stk));
+#endif // RUNTEST
   kfree(task);
+}
+
+void sched_task_destroy(struct sched_task *task) {
+  assert(task->parent);
+
+  bool is_current_task = task->parent->current_task == task;
+
+  // Bookkeeping (Top half).
+  sched_task_destroy_nostack(task);
 
   // If this is the running process, actually schedule away (Bottom half).
-  // We break it up like this so we can do cleanup tasks between the top half
-  // and bottom half.
-  if (new_task) {
+  if (is_current_task) {
     void *unused;
-    _sched_task_switch_stack(&unused, new_task->stk);
+    _sched_task_switch_stack(&unused, task->parent->current_task->stk);
   }
 }
 
@@ -157,4 +170,21 @@ void sched_task_switch_nostack(struct sched_task *task) {
 
   // Adjust scheduler state.
   scheduler->current_task = task;
+}
+
+void sched_destroy(struct scheduler *scheduler) {
+  if (scheduler->current_task) {
+    // Move the running task onto the runnable list, and destroy all the
+    // runnable/blocked tasks.
+    scheduler->current_task->state = SCHED_RUNNABLE;
+    list_add(&scheduler->runnable, &scheduler->current_task->ll);
+    scheduler->current_task = NULL;
+  }
+
+  list_foreach(&scheduler->blocked, item) {
+    sched_task_destroy_nostack(list_entry(item, struct sched_task, ll));
+  }
+  list_foreach(&scheduler->runnable, item) {
+    sched_task_destroy_nostack(list_entry(item, struct sched_task, ll));
+  }
 }

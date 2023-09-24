@@ -4,6 +4,10 @@
  * TODO(jlam55555): Set up unit tests.
  * TODO(jlam55555): Set up quanta.
  * TODO(jlam55555): Document idle task.
+ * TODO(jlam55555): Document scheduler "valid" state. Only after calling
+ * `sched_task_switch_nostack()` for the first time will there be a current task
+ * in a scheduler. Similarly, after calling `sched_destroy()` there will be no
+ * more tasks on this scheduler.
  */
 #ifndef SCHED_SCHED_H
 #define SCHED_SCHED_H
@@ -61,6 +65,12 @@ struct sched_task *sched_create_task(struct scheduler *scheduler,
 void sched_bootstrap_task(struct scheduler *scheduler);
 
 /**
+ * Top half of `sched_task_destroy()`. Doesn't switch stacks. Exposed for unit
+ * testing.
+ */
+void sched_task_destroy_nostack(struct sched_task *task);
+
+/**
  * Destroy task. If this is the current task in the scheduler, then schedule
  * away.
  */
@@ -104,5 +114,13 @@ void sched_task_switch(struct sched_task *task);
  * no old task to be torn down.
  */
 void sched_task_switch_nostack(struct sched_task *task);
+
+/**
+ * Tear down a scheduler and all tasks associated with it.
+ *
+ * Note that if those tasks allocated any memory, those are not tracked and
+ * would not be freed.
+ */
+void sched_destroy(struct scheduler *scheduler);
 
 #endif // SCHED_SCHED_H
