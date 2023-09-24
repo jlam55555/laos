@@ -48,3 +48,12 @@ bool list_empty(struct list_head *ll) {
   assert(ll);
   return ll->next == ll;
 }
+
+size_t list_length(const struct list_head *ll) {
+  assert(ll);
+  assert(ll->next);
+
+  size_t rval = 0;
+  list_foreach_const(ll, _) { ++rval; }
+  return rval;
+}

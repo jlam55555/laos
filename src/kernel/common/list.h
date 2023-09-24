@@ -27,6 +27,7 @@
 #define COMMON_LIST_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 struct list_head {
   struct list_head *prev;
@@ -90,5 +91,10 @@ bool list_empty(struct list_head *ll);
  */
 #define list_foreach_const(ll, it)                                             \
   for (const struct list_head *(it) = (ll); ((it) = (it)->next) != (ll);)
+
+/**
+ * Get list length.
+ */
+size_t list_length(const struct list_head *ll);
 
 #endif // COMMON_LIST_H

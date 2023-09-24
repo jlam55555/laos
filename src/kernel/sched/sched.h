@@ -21,6 +21,10 @@ struct scheduler {
   struct sched_task *current_task;
 };
 
+/**
+ * TODO(jlam55555): Document this.
+ * TODO(jlam55555): Allow tasks to have a desc/name.
+ */
 struct sched_task {
   struct list_head ll;
   struct scheduler *parent;
