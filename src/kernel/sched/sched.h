@@ -54,6 +54,10 @@ void sched_init(struct scheduler *scheduler);
 
 /**
  * Creates a task in the given scheduler.
+ *
+ * Note that the scheduler manages allocation rather than accepting a `struct
+ * sched_task *`. This is so that the scheduler also manages the destruction/
+ * freeing of all tasks.
  */
 struct sched_task *sched_create_task(struct scheduler *scheduler,
                                      void (*cb)(struct sched_task *));
@@ -73,13 +77,15 @@ void sched_task_destroy_nostack(struct sched_task *task);
 /**
  * Destroy task. If this is the current task in the scheduler, then schedule
  * away.
+ *
+ * Note that the destroyed task will be freed, so you cannot use it afterwards.
  */
 void sched_task_destroy(struct sched_task *task);
 
 /**
  * Choose the next task to schedule (but don't actually schedule). Behavior:
  *
- * - If the runnable queue is not empty, return any task on it.
+ * - If the runnable queue is not empty, return the first task on it.
  * - Return the current task.
  *
  * Note that the current task shouldn't be blocked. It's an error if it is,

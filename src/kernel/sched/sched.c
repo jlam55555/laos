@@ -16,8 +16,6 @@ void sched_init(struct scheduler *scheduler) {
 
 struct sched_task *sched_create_task(struct scheduler *scheduler,
                                      void (*cb)(struct sched_task *)) {
-  // TODO(jlam55555): Allow specifying the allocator.
-  // Actually, better yet to not allocate. Let the caller allocate.
   struct sched_task *task = kmalloc(sizeof(struct sched_task));
   if (!task) {
     return task;
@@ -88,6 +86,8 @@ void sched_task_destroy_nostack(struct sched_task *task) {
   // because of `sched_task_switch_nostack()`).
   list_del(&task->ll);
 
+  // TODO(jlam55555): This macro is not correct, since we can also run tests
+  // from the shell. Maybe we shouldn't allow that, for this reason?
 #ifdef RUNTEST
   // In testing scenarios we may not have allocated a stack.
   if (task->stk) {
@@ -175,9 +175,13 @@ void sched_task_switch_nostack(struct sched_task *task) {
 void sched_destroy(struct scheduler *scheduler) {
   if (scheduler->current_task) {
     // Move the running task onto the runnable list, and destroy all the
-    // runnable/blocked tasks.
+    // runnable/blocked tasks. We cannot simply destroy the runnable task
+    // because that would force another task to be scheduled on, and we would
+    // have to destroy that, and so on... until we run out of runnable tasks, at
+    // which point `sched_task_destroy()` will error because there are no
+    // schedulable tasks.
     scheduler->current_task->state = SCHED_RUNNABLE;
-    list_add(&scheduler->runnable, &scheduler->current_task->ll);
+    list_add_tail(&scheduler->runnable, &scheduler->current_task->ll);
     scheduler->current_task = NULL;
   }
 

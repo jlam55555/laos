@@ -20,11 +20,20 @@ This list will probably begin as a very generic list and become more and more fo
 - [ ] Terminal multiplexing (like GNU `screen`): multiplex a single terminal device for multiple processes
 
 ### Processes
-- [ ] Kernel threads
+- [X] Kernel threads
+- [ ] (Cooperative) scheduling
+- [ ] Timer interrupt/preemptive scheduling
 - [ ] Initial bootstrap from kernel mode into userspace
-- [ ] Userspace processes
-- [ ] Scheduling
-- [ ] Threads
+- [ ] Userspace threads/processes
+
+WIP: processes TODO:
+- Create convenience functions that use the default scheduler
+- Modify the shell to run things in a different thread.
+- Print process/thread tree
+- Clone() and fork()
+- Timer interrupt
+- Write some basic multithreaded programs
+- Next step: write some locking primitives (spinlock to start)
 
 ### Memory
 - Physical memory utilities:
