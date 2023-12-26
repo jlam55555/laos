@@ -2,9 +2,13 @@
 
 #include <assert.h>
 
+#include "common/libc.h" // for memcpy
 #include "common/list.h"
 #include "mem/phys.h"
 #include "mem/slab.h"
+
+// Main global scheduler.
+struct scheduler _scheduler;
 
 void sched_init(struct scheduler *scheduler) {
   list_init(&scheduler->runnable);
@@ -38,6 +42,7 @@ struct sched_task *sched_create_task(struct scheduler *scheduler,
     *stk = (size_t)cb;
 
     // Push %rbp, %rbx, %r12, %r13, %r14, %r15 (all garbage).
+    // (Really these should be zeroed for security reasons.)
     stk -= 6;
 
     // Save the stack.
@@ -191,4 +196,21 @@ void sched_destroy(struct scheduler *scheduler) {
   list_foreach(&scheduler->runnable, item) {
     sched_task_destroy_nostack(list_entry(item, struct sched_task, ll));
   }
+}
+
+void schedule(void) {
+  // Guard against the timer interrupt before startup.
+  // TODO(jlam55555): unlikely()
+  if (!_scheduler.current_task) {
+    return;
+  }
+  __asm__ volatile("cli");
+  sched_task_switch(sched_choose_task(&_scheduler));
+  __asm__ volatile("sti");
+}
+void sched_new(void *cb) { sched_create_task(&_scheduler, cb); }
+void sched_exit(void) { sched_task_destroy(_scheduler.current_task); }
+void sched_init_bootstrap(void) {
+  sched_init(&_scheduler);
+  sched_bootstrap_task(&_scheduler);
 }

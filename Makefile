@@ -90,7 +90,7 @@ ifneq ($(DEBUG),)
     override NASMFLAGS += -DDEBUG -g
     override OUT_DIR := $(OUT_DIR).debug
     ifeq ($(DEBUG),i)
-        override QEMUFLAGS += -s -S -no-reboot -no-shutdown
+        override QEMUFLAGS += -s -S -no-reboot -no-shutdown -d int
     endif
 endif
 

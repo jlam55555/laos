@@ -8,10 +8,8 @@
  * bootstrap process and before destruction).
  *
  * To perform scheduling, you must first initialize a scheduler object. Tasks
- * can be added to this scheduler (either via `sched_clone_task()` or
- * `sched_create_task()`, which are like Linux's `clone()` and `exec*()`
- * syscalls, respectively). Tasks can be scheduled using `sched_choose_task()`
- * and `sched_task_switch()`.
+ * can be added to this scheduler using `sched_create_task()`. Tasks can be
+ * scheduled using `sched_choose_task()` and `sched_task_switch()`.
  *
  * In general, you will not need to worry about creating a scheduler object, the
  * idle task, or bootstrapping process -- the interfaces to initialize a
@@ -21,9 +19,15 @@
  * This kernel uses pre-emptive scheduling. I.e., the timer interrupt will force
  * a process to call `schedule()` if it has exceeded its quantum.
  *
+ * This is the low-level scheduler in the kernel. The `proc_*()` methods build
+ * the (userspace) process abstraction on top of this threading model, adding
+ * many more features such as:
+ * - Userspace process model.
+ * - `clone()` and `exec*()` syscalls.
+ * - Userspace threads, processes, and process groups.
+ *
  * TODO(jlam55555): Set up quanta/pre-emptive scheduling.
- * TODO(jlam55555): Set up global main scheduler.
- * TODO(jlam55555): Implement `clone()` API.
+ * TODO(jlam55555): Implement processes.
  *
  * =============================================================================
  * Bootstrapping process
@@ -34,8 +38,8 @@
  * automatically bootstrap the given thread if there were no previously running
  * tasks. However, doing so will also discard the current stack, which may be
  * undesirable -- thus, the helper function `sched_bootstrap_task()` is provided
- * to form an `exec*()`-like interface to enter the scheduler for the first
- * time. This is used in the global main task scheduler.
+ * to enter the scheduler for the first time. This is used in the global main
+ * task scheduler.
  *
  * Bootstrapping a scheduler when another one is already running, or destroying
  * a bootstrapped scheduler are both UB -- we expect that there is exactly one
@@ -190,5 +194,25 @@ void sched_task_switch_nostack(struct sched_task *task);
  * would not be freed.
  */
 void sched_destroy(struct scheduler *scheduler);
+
+/**
+ * Schedule a task on the main scheduler.
+ */
+void schedule(void);
+
+/**
+ * Create a new task on the main scheduler.
+ */
+void sched_new(void *cb);
+
+/**
+ * Kill the current task. Similar to the `_exit()` syscall.
+ */
+void sched_exit(void);
+
+/**
+ * Init and enter the main scheduler.
+ */
+void sched_init_bootstrap(void);
 
 #endif // SCHED_SCHED_H

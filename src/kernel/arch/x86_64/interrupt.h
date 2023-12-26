@@ -16,6 +16,16 @@ struct interrupt_frame {
   size_t ss;
 };
 
+// Exceptions have an additional error code pushed onto the stack.
+struct exception_frame {
+  size_t code;
+  size_t ip;
+  size_t cs;
+  size_t flags;
+  size_t sp;
+  size_t ss;
+};
+
 extern struct gate_desc gates[64];
 extern struct idtr_desc idtr;
 

@@ -34,6 +34,7 @@ WIP: processes TODO:
 - Timer interrupt
 - Write some basic multithreaded programs
 - Next step: write some locking primitives (spinlock to start)
+- Backtrace
 
 ### Memory
 - Physical memory utilities:
