@@ -265,6 +265,9 @@ void *kmalloc(size_t sz) {
 
 void _slab_free(struct slab *slab, const void *obj) {
   // Find the position of the object in the freelist.
+  // - off: offset in bytes
+  // - index: offset in (# of elements)
+  // - i: position in stack
   const size_t off = obj - slab->data;
   const unsigned order = slab->parent->order;
 
@@ -276,7 +279,7 @@ void _slab_free(struct slab *slab, const void *obj) {
   assert(index < slab->parent->elements);
   const uint8_t i = slab->freelist[index].pos_in_stk;
 
-  // Free the element 0. Beforehand:
+  // Free the element at index 0. Beforehand:
   //
   //          used   |  free
   //     | 0 | 2 | 3 | 4 | 1 | stack_item
@@ -292,7 +295,7 @@ void _slab_free(struct slab *slab, const void *obj) {
   slab->freelist[i].stack_item = slab->freelist[slab->allocated].stack_item;
   slab->freelist[slab->allocated].stack_item = index;
 
-  slab->freelist[i].pos_in_stk = slab->allocated;
+  slab->freelist[index].pos_in_stk = slab->allocated;
   slab->freelist[slab->freelist[i].stack_item].pos_in_stk = i;
 }
 

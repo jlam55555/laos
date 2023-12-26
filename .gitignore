@@ -3,3 +3,6 @@ out*/
 
 # Emacs tempfiles
 *~
+
+# Misc.
+.gdb_history

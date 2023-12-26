@@ -7,9 +7,11 @@
 #include "common/libc.h"
 #include "common/util.h"
 #include "diag/shell.h"
+#include "diag/sys.h"
 #include "drivers/kbd.h"
 #include "drivers/serial.h"
 #include "mem/virt.h"
+#include "sched/sched.h"
 
 #ifdef RUNTEST
 #include "test/test.h"
@@ -29,8 +31,9 @@ static __attribute__((noreturn)) void _done(void) {
 
 static __attribute__((interrupt)) void
 _timer_irq(__attribute__((unused)) struct interrupt_frame *frame) {
-  // Nothing to do for now.
-  pic_send_eoi(0);
+  // Pre-emptive scheduling.
+  pic_send_eoi(/*interrupt_num=*/0);
+  schedule();
 }
 
 static struct kbd_driver *_kbd_driver;
@@ -40,13 +43,14 @@ _kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
   // TODO(jlam55555): Make the IRQ function accept the interrupt frame
   //    rather than the character.
   _kbd_driver->kbd_irq(inb(0x60));
-  pic_send_eoi(1);
+  pic_send_eoi(/*interrupt_num=*/1);
 }
 
 static __attribute__((interrupt)) void
-_gp_isr(__attribute((unused)) struct interrupt_frame *frame) {
-  printf("general protection fault\r\n");
-  _done();
+_gp_isr(__attribute((unused)) struct exception_frame *frame) {
+  // Infinite loop so QEMU doesn't crash and we can debug the stack frame.
+  for (;;) {
+  }
 }
 
 static __attribute__((interrupt)) void
@@ -70,13 +74,19 @@ _ud_isr(__attribute((unused)) struct interrupt_frame *frame) {
 static __attribute__((noreturn)) void _run_shell(void) {
 #ifdef RUNTEST
   run_tests(macro2str(RUNTEST));
-#else  // RUNTEST
-  // Simple diagnostic shell.
-  shell_init();
 #endif // RUNTEST
 
+  // Bootstrap into main scheduler.
+  sched_init_bootstrap();
+
+  // Simple diagnostic shell.
+  sched_new(&shell_init);
+
   // We're done, just wait for interrupt...
-  _done();
+  for (;;) {
+    printf("main thread\r\n");
+    __asm__ volatile("hlt");
+  }
 }
 
 /**
