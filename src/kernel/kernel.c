@@ -49,15 +49,17 @@ _kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
 
 static __attribute__((interrupt)) void
 _gp_isr(__attribute((unused)) struct exception_frame *frame) {
+  printf("gp fault\r\n");
   // Infinite loop so QEMU doesn't crash and we can debug the stack frame.
   for (;;) {
   }
 }
 
 static __attribute__((interrupt)) void
-_pf_isr(__attribute((unused)) struct interrupt_frame *frame) {
+_pf_isr(__attribute((unused)) struct exception_frame *frame) {
   printf("page fault\r\n");
-  _done();
+  for (;;) {
+  }
 }
 
 static __attribute__((interrupt)) void
@@ -83,16 +85,9 @@ static __attribute__((noreturn)) void _run_shell(void) {
   // Simple diagnostic shell.
   sched_new(&shell_init);
 
-  print_gdtr_info();
-
-  gdt_init();
-
-  // TODO(jlam55555): remove this.
-  print_gdtr_info();
-
   // We're done, just wait for interrupt...
   for (;;) {
-    /* printf("main thread\r\n"); */
+    printf("main thread\r\n");
     __asm__ volatile("hlt");
   }
 }
@@ -166,6 +161,13 @@ __attribute__((noreturn)) void _start(void) {
   create_interrupt_gate(&gates[14], _pf_isr);
   create_interrupt_gate(&gates[32], _timer_irq);
   create_interrupt_gate(&gates[33], _kb_irq);
+
+  // Set up GDT/IDT/TSS. GDT must be set up first because the TSS and IDT refer
+  // to it.
+  //
+  // TODO(jlam55555): Clean up the GDT/IDT setup code. Move the above
+  // create_interrupt_gate() calls somewhere else.
+  gdt_init();
   init_interrupts();
 
 #ifdef SERIAL

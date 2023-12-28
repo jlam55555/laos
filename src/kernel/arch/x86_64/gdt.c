@@ -81,11 +81,14 @@ static void _gdt_init_long_mode_tss_entry(struct gdt_segment_desc *seg) {
   memset(&_tss, 0, sizeof _tss);
 }
 
-__attribute__((naked)) static void _gdt_init_ret() {
-  __asm__ volatile("ret");
-  __builtin_unreachable();
-}
+__attribute__((naked)) static void _gdt_init_ret() { __asm__ volatile("ret"); }
 __attribute__((naked)) static void _gdt_init_jmp() {
+  // A few notes about long jump syntax from stackoverflow.com/a/51832726:
+  // - AT&T syntax uses `ljmp` rather than `jmp far`.
+  // - This takes a m16:64 operand. This is written in a big-endian way -- the
+  //   16 represents the high bits and the 64 represents the low bits.
+  // - GCC as doesn't compile this correctly, even if we specify the 'q' suffix;
+  //   we have to manually add the rex64 prefix.
   static struct ljmp_operand {
     uint64_t offset;
     uint16_t selector;
@@ -93,15 +96,7 @@ __attribute__((naked)) static void _gdt_init_jmp() {
       .offset = (uint64_t)_gdt_init_ret,
       .selector = 1 << 3,
   };
-  // A few notes about long jump syntax from
-  // https://stackoverflow.com/a/51832726:
-  // - AT&T syntax uses `ljmp` rather than `jmp far`.
-  // - This takes a m16:64 operand. This is written in a big-endian way -- the
-  //   16 represents the high bits and the 64 represents the low bits.
-  // - GCC as doesn't compile this correctly, even if we specify the 'q' suffix;
-  //   we have to manually add the rex64 prefix.
   __asm__("rex64 ljmp %0" : : "m"(op));
-  __builtin_unreachable();
 }
 
 void gdt_init(void) {
@@ -116,6 +111,14 @@ void gdt_init(void) {
   gdt_write(&_gdt_desc);
   tss_write(5);
 
+  // Update other registers.
+  uint16_t data_segment_selector = 2 << 3;
+  __asm__("mov %0, %%ds" : : "m"(data_segment_selector));
+  __asm__("mov %0, %%es" : : "m"(data_segment_selector));
+  __asm__("mov %0, %%ss" : : "m"(data_segment_selector));
+  __asm__("mov %0, %%fs" : : "m"(data_segment_selector));
+  __asm__("mov %0, %%gs" : : "m"(data_segment_selector));
+
   // Update CS register with a far jump.
-  /* _gdt_init_jmp(); */
+  _gdt_init_jmp();
 }

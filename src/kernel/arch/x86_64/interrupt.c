@@ -22,7 +22,7 @@ void create_interrupt_gate(struct gate_desc *gate_desc, void *isr) {
   gate_desc->segment_selector = (struct segment_selector){
       .rpl = 0,
       .ti = 0,
-      .index = 5,
+      .index = 1,
   };
 
   // Don't use IST.
