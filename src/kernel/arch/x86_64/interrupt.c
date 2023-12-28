@@ -20,9 +20,7 @@ void create_interrupt_gate(struct gate_desc *gate_desc, void *isr) {
   // Select 64-bit code segment of the GDT. See
   // https://github.com/limine-bootloader/limine/blob/trunk/PROTOCOL.md#x86_64.
   gate_desc->segment_selector = (struct segment_selector){
-      .rpl = 0,
-      .ti = 0,
-      .index = 1,
+      .index = GDT_SEGMENT_RING0_CODE,
   };
 
   // Don't use IST.

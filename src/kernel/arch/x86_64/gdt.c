@@ -1,27 +1,11 @@
 #include "arch/x86_64/gdt.h"
+#include "arch/x86_64/idt.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
-/**
- * Simple GDT for our purposes (all 64-bit segments). Same as that from
- * https://wiki.osdev.org/Getting_to_Ring_3#Entering_Ring_3.
- *
- *     gdt[0]  (8 bytes): null
- *     gdt[1]  (8 bytes): ring 0 code
- *     gdt[2]  (8 bytes): ring 0 data
- *     gdt[3]  (8 bytes): ring 3 code
- *     gdt[4]  (8 bytes): ring 3 data
- *     gdt[5] (16 bytes): TSS
- *
- * This is zero-initialized. Then `gdt_init()` fills in entries 1-5 and installs
- * the GDT.
- *
- * This overwrites Limine's default GDT, which lies in bootloader-reclaimable
- * memory and contains 16, 32, and 64-bit segments.
- */
-static struct gdt_segment_desc _gdt[7] = {};
+static struct gdt_segment_desc _gdt[7];
 static const struct gdt_desc _gdt_desc = {
     .off = (uint64_t)_gdt,
     .sz = sizeof(_gdt) - 1,
@@ -89,30 +73,33 @@ __attribute__((naked)) static void _gdt_init_jmp() {
   //   16 represents the high bits and the 64 represents the low bits.
   // - GCC as doesn't compile this correctly, even if we specify the 'q' suffix;
   //   we have to manually add the rex64 prefix.
-  static struct ljmp_operand {
+  static const struct ljmp_operand {
     uint64_t offset;
-    uint16_t selector;
+    struct segment_selector selector;
   } __attribute__((packed)) op = {
       .offset = (uint64_t)_gdt_init_ret,
-      .selector = 1 << 3,
+      .selector = (struct segment_selector){.index = GDT_SEGMENT_RING0_CODE},
   };
   __asm__("rex64 ljmp %0" : : "m"(op));
 }
 
 void gdt_init(void) {
   // Fill in GDT descriptors.
-  _gdt_init_long_mode_entry(&_gdt[1], true, 0);
-  _gdt_init_long_mode_entry(&_gdt[2], false, 0);
-  _gdt_init_long_mode_entry(&_gdt[3], true, 3);
-  _gdt_init_long_mode_entry(&_gdt[4], false, 3);
-  _gdt_init_long_mode_tss_entry(&_gdt[5]);
+  memset(&_gdt[0], 0, sizeof _gdt[GDT_SEGMENT_NULL]);
+  _gdt_init_long_mode_entry(&_gdt[GDT_SEGMENT_RING0_CODE], true, 0);
+  _gdt_init_long_mode_entry(&_gdt[GDT_SEGMENT_RING0_DATA], false, 0);
+  _gdt_init_long_mode_entry(&_gdt[GDT_SEGMENT_RING3_CODE], true, 3);
+  _gdt_init_long_mode_entry(&_gdt[GDT_SEGMENT_RING3_DATA], false, 3);
+  _gdt_init_long_mode_tss_entry(&_gdt[GDT_SEGMENT_TSS]);
 
   // Update the GDT and TSS descriptor to point at our new GDT/TSS.
   gdt_write(&_gdt_desc);
-  tss_write(5);
+  tss_write(GDT_SEGMENT_TSS);
 
-  // Update other registers.
-  uint16_t data_segment_selector = 2 << 3;
+  // Update segment descriptors (except CS).
+  struct segment_selector data_segment_selector = {
+      .index = GDT_SEGMENT_RING0_DATA,
+  };
   __asm__("mov %0, %%ds" : : "m"(data_segment_selector));
   __asm__("mov %0, %%es" : : "m"(data_segment_selector));
   __asm__("mov %0, %%ss" : : "m"(data_segment_selector));

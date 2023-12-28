@@ -16,12 +16,6 @@ struct idtr_desc {
   uint64_t off;
 } __attribute__((packed));
 
-struct segment_selector {
-  uint8_t rpl : 2;
-  uint8_t ti : 1;
-  uint16_t index : 13;
-} __attribute__((packed));
-
 // Gate descriptor describes an ISR.
 struct gate_desc {
   uint16_t off_1;
