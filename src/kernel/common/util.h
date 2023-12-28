@@ -72,4 +72,9 @@ static inline int ilog2(uint32_t n) {
  */
 static inline int ilog2ceil(uint32_t n) { return n ? ilog2(n - 1) + 1 : -1; }
 
+/**
+ * _Static_assert is a C11 extension. Make it look like the C++11/C23 syntax.
+ */
+#define static_assert _Static_assert
+
 #endif // COMMON_UTIL_H

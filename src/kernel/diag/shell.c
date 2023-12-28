@@ -1,6 +1,5 @@
 #include "diag/shell.h"
 
-#include "arch/x86_64/interrupt.h"
 #include "common/libc.h"
 #include "common/util.h"
 #include "diag/mm.h"
@@ -74,37 +73,12 @@ void _shell_handle_input(void) {
   _shell_input_size = 0;
 }
 
-/**
- * Copied from https://wiki.osdev.org/8259_PIC. Can be used for diagnostics.
- */
-#define PIC1_CMD 0x20
-#define PIC1_DATA 0x21
-#define PIC2_CMD 0xA0
-#define PIC2_DATA 0xA1
-#define PIC_READ_IRR 0x0a /* OCW3 irq ready next CMD read */
-#define PIC_READ_ISR 0x0b /* OCW3 irq service next CMD read */
-
-/* Helper func */
-static uint16_t __pic_get_irq_reg(int ocw3) {
-  /* OCW3 to PIC CMD to get the register values.  PIC2 is chained, and
-   * represents IRQs 8-15.  PIC1 is IRQs 0-7, with 2 being the chain */
-  outb(ocw3, PIC1_CMD);
-  outb(ocw3, PIC2_CMD);
-  return (((uint16_t)inb(PIC2_CMD)) << 8) | inb(PIC1_CMD);
-}
-
-/* Returns the combined value of the cascaded PICs irq request register */
-uint16_t pic_get_irr(void) { return __pic_get_irq_reg(PIC_READ_IRR); }
-
-/* Returns the combined value of the cascaded PICs in-service register */
-uint16_t pic_get_isr(void) { return __pic_get_irq_reg(PIC_READ_ISR); }
-
 void shell_init() {
   // Need to re-enable interrupts once the task is created since we cli upon
   // entering the scheduler.
   //
-  // TODO(jlam): Move this to a helper function so we don't need this at the
-  // beginning of each thread.
+  // TODO(jlam55555): Move this to a helper function so we don't need this at
+  // the beginning of each thread.
   __asm__ volatile("sti");
 
   _term_driver = get_default_term_driver();

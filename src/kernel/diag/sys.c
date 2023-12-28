@@ -7,8 +7,8 @@
 #include "arch/x86_64/idt.h"
 #include "common/libc.h"
 
-// TODO(jlam): Remove this. Or move to a unit test (and probably use sprintf
-// rather than printf).
+// TODO(jlam55555): Remove this. Or move to a unit test (and probably use
+// sprintf rather than printf).
 void run_printf_tests(void) {
   // Run some printf tests.
   char buf[256];
@@ -63,10 +63,10 @@ void run_printf_tests(void) {
   printf("got len=%d\r\n", len);
 }
 
-// TODO(jlam): saa
+// TODO(jlam55555): saa
 void print_gdtr_info(void) {
-  struct gdtr_desc gdtr;
-  struct segment_desc *seg_desc;
+  struct gdt_desc gdtr;
+  struct gdt_segment_desc *seg_desc;
   int num_entries;
   size_t base, limit;
 
@@ -75,7 +75,7 @@ void print_gdtr_info(void) {
 
   // Read segment descriptors.
   num_entries = ((size_t)gdtr.sz + 1) / sizeof(*seg_desc);
-  seg_desc = (struct segment_desc *)gdtr.off;
+  seg_desc = (struct gdt_segment_desc *)gdtr.off;
   for (; num_entries--; ++seg_desc) {
     // Compute limit. Multiply by page granularity if specified.
     limit = (size_t)seg_desc->limit_2 << 16 | seg_desc->limit_1;
@@ -103,7 +103,7 @@ void print_gdtr_info(void) {
   }
 }
 
-// TODO(jlam): saa
+// TODO(jlam55555): saa
 void print_idtr_info(void) {
   struct idtr_desc idtr;
   struct gate_desc *gate_desc;

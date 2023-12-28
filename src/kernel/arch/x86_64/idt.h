@@ -7,6 +7,7 @@
 #ifndef ARCH_X86_64_IDT_H
 #define ARCH_X86_64_IDT_H
 
+#include "arch/x86_64/gdt.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -27,7 +28,7 @@ struct gate_desc {
   struct segment_selector segment_selector;
   uint8_t ist : 3;
   uint8_t : 5;
-  uint8_t gate_type : 4;
+  enum system_segment_type gate_type : 4;
   uint8_t : 1;
   uint8_t dpl : 2;
   uint8_t p : 1;

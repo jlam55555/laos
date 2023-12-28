@@ -1,5 +1,6 @@
 #include "arch/x86_64/interrupt.h"
 
+#include "arch/x86_64/gdt.h"
 #include "common/util.h"
 
 struct gate_desc gates[64] = {};
@@ -10,9 +11,9 @@ struct idtr_desc idtr = {
 
 void pic_send_eoi(unsigned char irq) {
   if (irq >= 8)
-    outb(PIC_EOI, PIC2_COMMAND);
+    outb(PIC_EOI, PIC2_CMD);
 
-  outb(PIC_EOI, PIC1_COMMAND);
+  outb(PIC_EOI, PIC1_CMD);
 }
 
 void create_interrupt_gate(struct gate_desc *gate_desc, void *isr) {
@@ -28,7 +29,7 @@ void create_interrupt_gate(struct gate_desc *gate_desc, void *isr) {
   gate_desc->ist = 0;
 
   // ISR.
-  gate_desc->gate_type = 0xe;
+  gate_desc->gate_type = SSTYPE_INTERRUPT_GATE;
 
   // Run in ring 0.
   gate_desc->dpl = 0;
@@ -61,3 +62,14 @@ void init_interrupts(void) {
   /* __asm__ volatile("int $33"); */
   __asm__ volatile("sti");
 }
+
+static uint16_t _pic_get_irq_reg(int ocw3) {
+  // OCW3 to PIC CMD to get the register values. PIC2 is chained, and
+  // represents IRQs 8-15.  PIC1 is IRQs 0-7, with 2 being the chain.
+  outb(ocw3, PIC1_CMD);
+  outb(ocw3, PIC2_CMD);
+  return (((uint16_t)inb(PIC2_CMD)) << 8) | inb(PIC1_CMD);
+}
+
+uint16_t pic_get_irr(void) { return _pic_get_irq_reg(PIC_READ_IRR); }
+uint16_t pic_get_isr(void) { return _pic_get_irq_reg(PIC_READ_ISR); }

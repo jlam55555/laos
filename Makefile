@@ -89,8 +89,9 @@ ifneq ($(DEBUG),)
     override CFLAGS += -DDEBUG -g -save-temps=obj
     override NASMFLAGS += -DDEBUG -g
     override OUT_DIR := $(OUT_DIR).debug
+    override QEMUFLAGS += -no-reboot -no-shutdown # -d int
     ifeq ($(DEBUG),i)
-        override QEMUFLAGS += -s -S -no-reboot -no-shutdown -d int
+        override QEMUFLAGS += -s -S
     endif
 endif
 

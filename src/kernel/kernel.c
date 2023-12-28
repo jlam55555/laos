@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "arch/x86_64/gdt.h"
 #include "arch/x86_64/interrupt.h"
 #include "common/libc.h"
 #include "common/util.h"
@@ -82,9 +83,16 @@ static __attribute__((noreturn)) void _run_shell(void) {
   // Simple diagnostic shell.
   sched_new(&shell_init);
 
+  print_gdtr_info();
+
+  gdt_init();
+
+  // TODO(jlam55555): remove this.
+  print_gdtr_info();
+
   // We're done, just wait for interrupt...
   for (;;) {
-    printf("main thread\r\n");
+    /* printf("main thread\r\n"); */
     __asm__ volatile("hlt");
   }
 }
@@ -166,11 +174,4 @@ __attribute__((noreturn)) void _start(void) {
 
   virt_mem_init(*limine_memmap_response->entries,
                 limine_memmap_response->entry_count, _run_shell);
-
-  /* volatile int a = *(int *)5 * 1024 * 1024 * 1024; */
-  /* volatile int b = *(int *)0; */
-  /* int f = 3; */
-  /* volatile int e = 5 / f; */
-  /* int d = 0; */
-  /* __attribute__((unused)) volatile int c = 5 / d; */
 }
