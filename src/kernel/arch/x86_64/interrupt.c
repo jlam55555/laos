@@ -2,6 +2,11 @@
 
 #include "arch/x86_64/gdt.h"
 #include "common/util.h"
+#include "drivers/kbd.h"
+#include "sched/sched.h" // for schedule
+
+// TODO(jlam55555): We shouldn't really be printf()-ing in interrupts.
+#include "common/libc.h" // for printf
 
 struct gate_desc gates[64] = {};
 struct idtr_desc idtr = {
@@ -41,7 +46,60 @@ void create_interrupt_gate(struct gate_desc *gate_desc, void *isr) {
   gate_desc->off_3 = (size_t)isr >> 32;
 }
 
-void init_interrupts(void) {
+static __attribute__((interrupt)) void
+_timer_irq(__attribute__((unused)) struct interrupt_frame *frame) {
+  // Pre-emptive scheduling.
+  pic_send_eoi(/*interrupt_num=*/0);
+  schedule();
+}
+
+struct kbd_driver *_kbd_driver;
+static __attribute__((interrupt)) void
+_kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
+  // Pass scancode to keyboard IRQ handler.
+  // TODO(jlam55555): Make the IRQ function accept the interrupt frame
+  //    rather than the character.
+  _kbd_driver->kbd_irq(inb(0x60));
+  pic_send_eoi(/*interrupt_num=*/1);
+}
+
+static __attribute__((interrupt)) void
+_gp_isr(__attribute((unused)) struct exception_frame *frame) {
+  printf("gp fault\r\n");
+  // Infinite loop so QEMU doesn't crash and we can debug the stack frame.
+  for (;;) {
+  }
+}
+
+static __attribute__((interrupt)) void
+_pf_isr(__attribute((unused)) struct exception_frame *frame) {
+  printf("page fault\r\n");
+  for (;;) {
+  }
+}
+
+static __attribute__((interrupt)) void
+_div_isr(__attribute((unused)) struct interrupt_frame *frame) {
+  printf("div zero\r\n");
+  for (;;) {
+  }
+}
+
+static __attribute__((interrupt)) void
+_ud_isr(__attribute((unused)) struct interrupt_frame *frame) {
+  printf("invalid opcode\r\n");
+  for (;;) {
+  }
+}
+
+void idt_init(void) {
+  create_interrupt_gate(&gates[0], _div_isr);
+  create_interrupt_gate(&gates[6], _ud_isr);
+  create_interrupt_gate(&gates[13], _gp_isr);
+  create_interrupt_gate(&gates[14], _pf_isr);
+  create_interrupt_gate(&gates[32], _timer_irq);
+  create_interrupt_gate(&gates[33], _kb_irq);
+
   // https://forum.osdev.org/viewtopic.php?p=316295#p316295
   outb(0x11, 0x20); // initialize, pic1_cmd
   outb(0x11, 0xA0); // initialize, pic2_cmd
@@ -57,7 +115,6 @@ void init_interrupts(void) {
 
   load_idtr(&idtr);
 
-  /* __asm__ volatile("int $33"); */
   __asm__ volatile("sti");
 }
 

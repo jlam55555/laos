@@ -142,7 +142,7 @@ static_assert(sizeof(struct tss) == 104, "sizeof tss");
  * from the GDT on some instructions based on the visible part, which may not be
  * correct anymore.
  */
-inline void read_gdt(struct gdt_desc *gdt_desc) {
+inline void gdt_read(struct gdt_desc *gdt_desc) {
   __asm__ volatile("sgdt %0" : "=m"(*gdt_desc));
 }
 inline void gdt_write(const struct gdt_desc *const gdt_desc) {

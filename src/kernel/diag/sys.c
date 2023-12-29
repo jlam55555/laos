@@ -6,6 +6,52 @@
 #include "arch/x86_64/gdt.h"
 #include "arch/x86_64/idt.h"
 #include "common/libc.h"
+#include "limine.h"
+
+void print_limine_mmap(struct limine_memmap_response *limine_memmap_response) {
+  // Print out information about the current memory map.
+  void *prev_end = NULL;
+  for (size_t i = 0; i < limine_memmap_response->entry_count; ++i) {
+    struct limine_memmap_entry *mmap_entry =
+        (*limine_memmap_response->entries) + i;
+    char *type_str;
+    switch (mmap_entry->type) {
+    case LIMINE_MEMMAP_USABLE:
+      type_str = "USABLE";
+      break;
+    case LIMINE_MEMMAP_RESERVED:
+      type_str = "RESERVED";
+      break;
+    case LIMINE_MEMMAP_ACPI_RECLAIMABLE:
+      type_str = "ACPI_RECLAIMABLE";
+      break;
+    case LIMINE_MEMMAP_ACPI_NVS:
+      type_str = "ACPI_NVS";
+      break;
+    case LIMINE_MEMMAP_BAD_MEMORY:
+      type_str = "BAD_MEMORY";
+      break;
+    case LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE:
+      type_str = "BOOTLOADER_RECLAIMABLE";
+      break;
+    case LIMINE_MEMMAP_KERNEL_AND_MODULES:
+      type_str = "KERNEL_AND_MODULES";
+      break;
+    case LIMINE_MEMMAP_FRAMEBUFFER:
+      type_str = "FRAMEBUFFER";
+      break;
+    default:
+      type_str = "UNKNOWN";
+    }
+    if (mmap_entry->base != (size_t)prev_end) {
+      printf("gap: %lx, len: %lx\r\n", prev_end,
+             mmap_entry->base - (size_t)prev_end);
+    }
+    prev_end = (void *)(mmap_entry->base + mmap_entry->length);
+    printf("base: %lx, len: %lx, type: %s\r\n", mmap_entry->base,
+           mmap_entry->length, type_str);
+  }
+}
 
 // TODO(jlam55555): Remove this. Or move to a unit test (and probably use
 // sprintf rather than printf).
@@ -70,7 +116,7 @@ void print_gdtr_info(void) {
   int num_entries;
   size_t base, limit;
 
-  read_gdt(&gdtr);
+  gdt_read(&gdtr);
   printf("gdtr {\r\n\t.sz=0x%hx\r\n\t.off=0x%lx\r\n}\r\n", gdtr.sz, gdtr.off);
 
   // Read segment descriptors.

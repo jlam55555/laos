@@ -1,6 +1,8 @@
 /**
- * Interrupts. These data structures
- * (interrupt frames, IDT) are x86_64 specific.
+ * Interrupts. These data structures (interrupt frames, IDT) are x86_64
+ * specific.
+ *
+ * TODO(jlam55555): Clean this up/merge with idt.h.
  */
 #ifndef ARCH_x86_64_INTERRUPT_H
 #define ARCH_x86_64_INTERRUPT_H
@@ -59,5 +61,13 @@ uint16_t pic_get_irr(void);
  * Returns the combined value of the cascaded PICs In-Service Register.
  */
 uint16_t pic_get_isr(void);
+
+/**
+ * Set up basic interrupt table.
+ */
+void idt_init(void);
+
+// Used by keyboard interrupt.
+extern struct kbd_driver *_kbd_driver;
 
 #endif // ARCH_x86_64_INTERRUPT_H
