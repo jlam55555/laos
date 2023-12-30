@@ -26,9 +26,6 @@
  * - `clone()` and `exec*()` syscalls.
  * - Userspace threads, processes, and process groups.
  *
- * TODO(jlam55555): Set up quanta/pre-emptive scheduling.
- * TODO(jlam55555): Implement processes.
- *
  * =============================================================================
  * Bootstrapping process
  * =============================================================================

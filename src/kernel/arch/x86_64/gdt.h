@@ -163,4 +163,9 @@ inline void tss_write(uint16_t tss_segment_index) {
   __asm__ volatile("ltr %0" : : "m"(tss_segment_selector) : "ax");
 }
 
+/**
+ * Write the kernel stack pointer (rsp0) to return to after an interrupt.
+ */
+void tss_set_kernel_stack(void *rsp0);
+
 #endif // ARCH_X86_64_GDT_H

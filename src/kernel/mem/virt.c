@@ -47,6 +47,7 @@ void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
         ((size_t)VM_TO_IDM(_virt_alloc_pmlx_table()) & (PM_MAX_BIT - 1)) >>    \
         PG_SZ_BITS;                                                            \
     pmle->rw = true;                                                           \
+    pmle->us = 1;                                                              \
   }                                                                            \
   pmlnext = VM_TO_HHDM(pmle->addr << PG_SZ_BITS);
 
@@ -61,6 +62,7 @@ void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
     pml2e->ps = true;
     pml2e->addr = ((size_t)phys_addr & (PM_MAX_BIT - 1)) >> PG_SZ_BITS;
     pml2e->rw = true;
+    pml2e->us = 1;
   } else {
     assert(PG_ALIGNED(phys_addr));
     assert(PG_ALIGNED(virt_addr));
@@ -70,6 +72,7 @@ void _virt_map_page(struct pmlx_entry *pml4, void *phys_addr, void *virt_addr,
     pml1e->p = true;
     pml1e->addr = ((size_t)phys_addr & (PM_MAX_BIT - 1)) >> PG_SZ_BITS;
     pml1e->rw = true;
+    pml1e->us = 1;
   }
 #undef GET_PMLNEXT
 #undef GET_PMLE

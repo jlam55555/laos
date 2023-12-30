@@ -9,6 +9,8 @@
 #include "sched/sched.h"
 #include "test/test.h"
 
+#include "proc/process.h" // for proc_jump_userspace
+
 #define SHELL_INPUT_BUF_SZ 4095
 
 static struct term_driver *_term_driver;
@@ -66,11 +68,22 @@ void _shell_handle_input(void) {
   // Null-terminate string.
   _shell_input_buf[_shell_input_size] = 0;
 
-  // TODO(jlam55555): Implement some simple commands here.
+  // Dispatch command.
   _shell_dispatch(_shell_input_buf);
 
   // Reset terminal input.
   _shell_input_size = 0;
+}
+
+static void _foo(void) {
+  // Trigger a GP fault:
+  /* __asm__ volatile("cli"); */
+
+  // Still doesn't work because writing to the terminal device requires a
+  // privileged command. Sad. Will implement syscalls soon.
+  printf("Made it to userspace! Woohoo!\r\n");
+  for (;;) {
+  }
 }
 
 void shell_init() {
@@ -85,11 +98,14 @@ void shell_init() {
   _shell_input_size = 0;
   _shell_prompt();
 
+  // Jump into userspace.
+  proc_jump_userspace(_foo);
+
   // Yield task; nothing to do for now.
-  for (;;) {
-    shell_on_interrupt();
-    schedule();
-  }
+  /* for (;;) { */
+  /*   shell_on_interrupt(); */
+  /*   schedule(); */
+  /* } */
 }
 
 void shell_on_interrupt() {

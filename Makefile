@@ -89,13 +89,18 @@ ifneq ($(DEBUG),)
     override CFLAGS += -DDEBUG -g -save-temps=obj
     override NASMFLAGS += -DDEBUG -g
     override OUT_DIR := $(OUT_DIR).debug
-    override QEMUFLAGS += -no-reboot -no-shutdown # -d int
+    override QEMUFLAGS += -no-reboot -no-shutdown
     ifeq ($(DEBUG),i)
         override QEMUFLAGS += -s -S
     endif
 endif
 
-# See final output directory. https://stackoverflow.com/a/16489377/2397327
+# Useful for debugging interrupts, e.g., in double/triple-fault cases.
+ifneq ($(SHOWINT),)
+    override QEMUFLAGS += -d int
+endif
+
+# See final output directory. https://stackoverflow.com/a/16489377/
 $(info $$OUT_DIR is [${OUT_DIR}])
 
 # Internal C flags that should not be changed by the user.

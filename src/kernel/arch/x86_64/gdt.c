@@ -13,7 +13,7 @@ static const struct gdt_desc _gdt_desc = {
 static struct tss _tss;
 
 static void _gdt_init_long_mode_entry(struct gdt_segment_desc *seg, bool code,
-                                      bool dpl) {
+                                      int dpl) {
   // Limit, base ignored in long mode descriptor.
   seg->limit_1 = seg->limit_2 = 0;
   seg->base_1 = seg->base_2 = seg->base_3 = 0;
@@ -21,7 +21,6 @@ static void _gdt_init_long_mode_entry(struct gdt_segment_desc *seg, bool code,
 
   seg->access_a = 0;
   seg->access_rw = 1;
-  // TODO(jlam55555): Does this allow ring 3 code to be executed in ring 0?
   seg->access_dc = 0;
   seg->access_e = code;
   seg->access_s = 1;
@@ -109,3 +108,5 @@ void gdt_init(void) {
   // Update CS register with a far jump.
   _gdt_init_jmp();
 }
+
+void tss_set_kernel_stack(void *rsp0) { _tss.rsp0 = rsp0; }

@@ -19,4 +19,10 @@ struct process {
  */
 extern struct process *curr_process;
 
+/**
+ * Jump into userspace. This performs an `iret` as described in
+ * https://wiki.osdev.org/Getting_to_Ring_3#Entering_Ring_3.
+ */
+void proc_jump_userspace(void (*cb)(void));
+
 #endif // PROC_PROCESS_H

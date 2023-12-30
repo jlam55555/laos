@@ -65,7 +65,7 @@ _kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
 
 static __attribute__((interrupt)) void
 _gp_isr(__attribute((unused)) struct exception_frame *frame) {
-  printf("gp fault\r\n");
+  printf("gp fault (0x%x)\r\n", frame->code);
   // Infinite loop so QEMU doesn't crash and we can debug the stack frame.
   for (;;) {
   }
@@ -73,7 +73,9 @@ _gp_isr(__attribute((unused)) struct exception_frame *frame) {
 
 static __attribute__((interrupt)) void
 _pf_isr(__attribute((unused)) struct exception_frame *frame) {
-  printf("page fault\r\n");
+  uint64_t cr2;
+  __asm__("movq %%cr2, %0" : "=r"(cr2));
+  printf("page fault (code=0x%x cr2=0x%lx)\r\n", frame->code, cr2);
   for (;;) {
   }
 }
