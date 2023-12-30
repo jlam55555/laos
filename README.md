@@ -67,6 +67,8 @@ I.e., interest points.
 - Interrupt handling and latencies
 - Integrating Rust as a systems language
 
+There are some Markdown notes in the [docs/](./docs) directory. This isn't done in a systematic way, and I may also write up some more cohesive notes in blog posts.
+
 ### Non-goals
 
 - Creating a userspace application environment
@@ -74,9 +76,10 @@ I.e., interest points.
 - UI system (except maybe an X clone)
 - Becoming the next Linux (or Windows, or Mac OS)
 
-### Other projects with this name
+### Other things with this name
 
 - [Latency Aware Operating System][laos-2]
+- the country
 
 [laos-2]: https://www4.cs.fau.de/Research/LAOS/
 [qemu]: https://wiki.archlinux.org/title/QEMU
