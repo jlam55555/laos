@@ -1,7 +1,7 @@
         .text
-        // void _sched_task_switch_stack(void **old_stk, void *new_stk);
-        .globl _sched_task_switch_stack
-_sched_task_switch_stack:
+        // void arch_stack_switch(void **old_stk, void *new_stk);
+        .globl arch_stack_switch
+arch_stack_switch:
         // Save callee-save registers.
         push %rbp
         push %rbx

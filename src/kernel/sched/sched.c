@@ -2,7 +2,8 @@
 
 #include <assert.h>
 
-#include "common/libc.h" // for memcpy
+#include "arch/x86_64/sched.h" // for arch_stack_init, arch_stack_switch
+#include "common/libc.h"       // for memcpy
 #include "common/list.h"
 #include "common/opcodes.h" // for op_cli, op_sti
 #include "mem/phys.h"       // for phys_alloc_page
@@ -38,13 +39,7 @@ struct sched_task *sched_create_task(struct scheduler *scheduler,
     // Go to the top of the page.
     stk = (void *)stk + PG_SZ;
 
-    // Push %rip.
-    --stk;
-    *stk = (size_t)cb;
-
-    // Push %rbp, %rbx, %r12, %r13, %r14, %r15 (all garbage).
-    // (Really these should be zeroed for security reasons.)
-    stk -= 6;
+    arch_stack_init(&stk, cb);
 
     // Save the stack.
     task->stk = stk;
@@ -66,12 +61,6 @@ void sched_bootstrap_task(struct scheduler *scheduler) {
   // process (no previous running task).
   sched_task_switch_nostack(task);
 }
-
-/**
- * Bottom-half of the task switch mechanism. Implemented in pure asm so we don't
- * accidentally clobber registers.
- */
-void _sched_task_switch_stack(void *old_stk, void *new_stk);
 
 void sched_task_destroy_nostack(struct sched_task *task) {
   // If this is the running process, schedule away (Top half).
@@ -118,7 +107,7 @@ void sched_task_destroy(struct sched_task *task) {
   // If this is the running process, actually schedule away (Bottom half).
   if (is_current_task) {
     void *unused;
-    _sched_task_switch_stack(&unused, task->parent->current_task->stk);
+    arch_stack_switch(&unused, task->parent->current_task->stk);
   }
 }
 
@@ -144,7 +133,7 @@ void sched_task_switch(struct sched_task *task) {
   sched_task_switch_nostack(task);
 
   // Bottom-half.
-  _sched_task_switch_stack(&old_task->stk, task->stk);
+  arch_stack_switch(&old_task->stk, task->stk);
 }
 
 void sched_task_switch_nostack(struct sched_task *task) {
