@@ -9,17 +9,17 @@
  * is not located in bootloader-reclaimable memory).
  *
  * - kernel map: virt 0xffffffff80000000 maps to phys <start of kernel> with
- * size <size of kernel>. This is the same as the Limine spec, and is used so
- * that any initialized global pointers to statically-allocated memory (e.g.,
- * for the console) remains valid. This virtual address space is limited to
- * 4GiB, but the kernel text+data+bss size is realistically much lower than
- * that.
+ *   size <size of kernel>. This is the same as the Limine spec, and is used so
+ *   that any initialized global pointers to statically-allocated memory (e.g.,
+ *   for the console) remains valid. This virtual address space is limited to
+ *   4GiB, but the kernel text+data+bss size is realistically much lower than
+ *   that.
  * - HHDM: virt 0xffff800000000000 maps to phys 0x0, with size <size of phys
- * mem>. This is a linear mapping of all physical memory to the beginning of
- * high memory (0xffff800000000000 is the first valid canonical address in high
- * memory.) A similar mapping is set in the Limine spec, although it exactly
- * 4GiB. High memory is limited to 2^47=128TiB, but realistically we're dealing
- * with much smaller RAM sizes.
+ *   mem>. This is a linear mapping of all physical memory to the beginning of
+ *   high memory (0xffff800000000000 is the first valid canonical address in
+ *   high memory.) A similar mapping is set in the Limine spec, although it
+ *   exactly 4GiB. High memory is limited to 2^47=128TiB, but realistically
+ *   we're dealing with much smaller RAM sizes.
  *
  * An identity map is not provided; use of the HHDM is preferred. The identity
  * map is only really useful before the initial page table is set up.
@@ -45,7 +45,7 @@
 #include <limine.h>
 #include <stddef.h>
 
-/*
+/**
  * Similar to `struct vm_area_struct` in Linux. Represents a contiguous VM
  * region allocated (mapped) by a process via `mmap()`, but not necessarily all
  * mapped in the page table. The page fault handler will use this to determine

@@ -4,8 +4,9 @@
 
 #include "common/libc.h" // for memcpy
 #include "common/list.h"
-#include "mem/phys.h"
-#include "mem/slab.h"
+#include "common/opcodes.h" // for op_cli, op_sti
+#include "mem/phys.h"       // for phys_alloc_page
+#include "mem/slab.h"       // for kmalloc
 
 // Main global scheduler.
 struct scheduler _scheduler;
@@ -204,9 +205,9 @@ void schedule(void) {
   if (!_scheduler.current_task) {
     return;
   }
-  __asm__ volatile("cli");
+  op_cli();
   sched_task_switch(sched_choose_task(&_scheduler));
-  __asm__ volatile("sti");
+  op_sti();
 }
 void sched_new(void *cb) { sched_create_task(&_scheduler, cb); }
 void sched_exit(void) { sched_task_destroy(_scheduler.current_task); }

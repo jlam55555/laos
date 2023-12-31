@@ -1,10 +1,10 @@
 #include "mem/slab.h"
 
-#include "arch/x86_64/pt.h"
 #include "common/libc.h"
 #include "common/list.h"
-#include "common/util.h"
-#include "mem/phys.h"
+#include "common/util.h" // for static_assert
+#include "mem/phys.h"    // for phys_*
+#include "mem/vm.h"      // for VM_TO_HHDM, VM_TO_IDM
 
 #include <assert.h>
 
@@ -42,7 +42,7 @@ struct slab {
  * requiring `__attribute__((packed))`. This is to prevent gcc from complaining
  * about bad alignment.
  */
-_Static_assert(sizeof(struct slab) == 40);
+static_assert(sizeof(struct slab) == 40);
 
 /**
  * Main slab caches.

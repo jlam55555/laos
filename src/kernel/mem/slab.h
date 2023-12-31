@@ -70,8 +70,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "common/list.h" // struct list_head
-#include "mem/phys.h"    // struct phys_rra
+#include "common/list.h" // for struct list_head
+#include "mem/phys.h"    // for struct phys_rra
 
 #define SLAB_MIN_ORDER 4
 #define SLAB_MAX_ORDER 16

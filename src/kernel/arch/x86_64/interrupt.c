@@ -1,7 +1,7 @@
 #include "arch/x86_64/interrupt.h"
 
 #include "arch/x86_64/gdt.h"
-#include "common/util.h"
+#include "arch/x86_64/opcodes.h" // for arch_outb, arch_inb
 #include "drivers/kbd.h"
 #include "sched/sched.h" // for schedule
 
@@ -15,10 +15,11 @@ struct idtr_desc idtr = {
 };
 
 void pic_send_eoi(unsigned char irq) {
-  if (irq >= 8)
-    outb(PIC_EOI, PIC2_CMD);
+  if (irq >= 8) {
+    arch_outb(PIC_EOI, PIC2_CMD);
+  }
 
-  outb(PIC_EOI, PIC1_CMD);
+  arch_outb(PIC_EOI, PIC1_CMD);
 }
 
 void create_interrupt_gate(struct gate_desc *gate_desc, void *isr) {
@@ -53,13 +54,13 @@ _timer_irq(__attribute__((unused)) struct interrupt_frame *frame) {
   schedule();
 }
 
-struct kbd_driver *_kbd_driver;
+static struct kbd_driver *_kbd_driver;
 static __attribute__((interrupt)) void
 _kb_irq(__attribute__((unused)) struct interrupt_frame *frame) {
   // Pass scancode to keyboard IRQ handler.
   // TODO(jlam55555): Make the IRQ function accept the interrupt frame
   //    rather than the character.
-  _kbd_driver->kbd_irq(inb(0x60));
+  _kbd_driver->kbd_irq(arch_inb(0x60));
   pic_send_eoi(/*interrupt_num=*/1);
 }
 
@@ -95,6 +96,9 @@ _ud_isr(__attribute((unused)) struct interrupt_frame *frame) {
 }
 
 void idt_init(void) {
+  // Used by keyboard interrupt.
+  _kbd_driver = get_default_kbd_driver();
+
   create_interrupt_gate(&gates[0], _div_isr);
   create_interrupt_gate(&gates[6], _ud_isr);
   create_interrupt_gate(&gates[13], _gp_isr);
@@ -103,17 +107,17 @@ void idt_init(void) {
   create_interrupt_gate(&gates[33], _kb_irq);
 
   // https://forum.osdev.org/viewtopic.php?p=316295#p316295
-  outb(0x11, 0x20); // initialize, pic1_cmd
-  outb(0x11, 0xA0); // initialize, pic2_cmd
-  outb(0x20, 0x21); // 32 (offset), pic1_data
-  outb(40, 0xA1);   // 40 (offset), pic2_data
-  outb(0x04, 0x21); // slave PIC at IRQ2, pic1_data
-  outb(0x02, 0xA1); // cascade identity, pic2_data
-  outb(0x01, 0x21); // 8086 mode, pic1_data
-  outb(0x01, 0xA1); // 8086 mode, pic2_data
+  arch_outb(0x11, 0x20); // initialize, pic1_cmd
+  arch_outb(0x11, 0xA0); // initialize, pic2_cmd
+  arch_outb(0x20, 0x21); // 32 (offset), pic1_data
+  arch_outb(40, 0xA1);   // 40 (offset), pic2_data
+  arch_outb(0x04, 0x21); // slave PIC at IRQ2, pic1_data
+  arch_outb(0x02, 0xA1); // cascade identity, pic2_data
+  arch_outb(0x01, 0x21); // 8086 mode, pic1_data
+  arch_outb(0x01, 0xA1); // 8086 mode, pic2_data
 
-  outb(0xF8, 0x21); // 0b11111000 mask, pic1_data -- unmask irq 0, 1, 2
-  outb(0xEF, 0xA1); // 0b11101111 mask, pic2_data -- unmask irq 12
+  arch_outb(0xF8, 0x21); // 0b11111000 mask, pic1_data -- unmask irq 0, 1, 2
+  arch_outb(0xEF, 0xA1); // 0b11101111 mask, pic2_data -- unmask irq 12
 
   load_idtr(&idtr);
 
@@ -123,9 +127,9 @@ void idt_init(void) {
 static uint16_t _pic_get_irq_reg(int ocw3) {
   // OCW3 to PIC CMD to get the register values. PIC2 is chained, and
   // represents IRQs 8-15.  PIC1 is IRQs 0-7, with 2 being the chain.
-  outb(ocw3, PIC1_CMD);
-  outb(ocw3, PIC2_CMD);
-  return (((uint16_t)inb(PIC2_CMD)) << 8) | inb(PIC1_CMD);
+  arch_outb(ocw3, PIC1_CMD);
+  arch_outb(ocw3, PIC2_CMD);
+  return (((uint16_t)arch_inb(PIC2_CMD)) << 8) | arch_inb(PIC1_CMD);
 }
 
 uint16_t pic_get_irr(void) { return _pic_get_irq_reg(PIC_READ_IRR); }

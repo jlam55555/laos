@@ -1,11 +1,12 @@
 /**
- * Resources for user-space processes.
+ * Utilities for the user-space process model.
  */
 
 #ifndef PROC_PROCESS_H
 #define PROC_PROCESS_H
 
-#include "mem/virt.h" // for struct vm_area
+#include "arch/x86_64/entry.h" // for arch_jump_userspace
+#include "mem/virt.h"          // for struct vm_area
 
 /**
  * Analogous to `struct task_struct` in Linux.
@@ -20,9 +21,8 @@ struct process {
 extern struct process *curr_process;
 
 /**
- * Jump into userspace. This performs an `iret` as described in
- * https://wiki.osdev.org/Getting_to_Ring_3#Entering_Ring_3.
+ * Jump into userspace.
  */
-void proc_jump_userspace(void (*cb)(void));
+#define proc_jump_userspace arch_jump_userspace
 
 #endif // PROC_PROCESS_H

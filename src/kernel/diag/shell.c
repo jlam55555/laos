@@ -5,9 +5,14 @@
 #include "diag/mm.h"
 #include "drivers/console.h"
 #include "drivers/term.h"
-#include "mem/phys.h"
 #include "sched/sched.h"
 #include "test/test.h"
+
+// TODO(jlam55555): Remove this once we add sched_new prelude.
+#include "common/opcodes.h" // for op_sti
+
+// TODO(jlam55555): For testing shell commands; remove
+#include "mem/phys.h" // for phys_alloc_page
 
 #include "proc/process.h" // for proc_jump_userspace
 
@@ -95,8 +100,9 @@ void shell_init() {
   // entering the scheduler.
   //
   // TODO(jlam55555): Move this to a helper function so we don't need this at
-  // the beginning of each thread.
-  __asm__ volatile("sti");
+  // the beginning of each thread. Also so we don't have architecture-specific
+  // stuff outside of arch/.
+  op_sti();
 
   _term_driver = get_default_term_driver();
   _shell_input_size = 0;

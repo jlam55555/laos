@@ -67,7 +67,4 @@ uint16_t pic_get_isr(void);
  */
 void idt_init(void);
 
-// Used by keyboard interrupt.
-extern struct kbd_driver *_kbd_driver;
-
 #endif // ARCH_x86_64_INTERRUPT_H

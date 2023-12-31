@@ -3,6 +3,7 @@
 #include "arch/x86_64/pt.h"
 #include "arch/x86_64/registers.h"
 #include "common/libc.h"
+#include "mem/vm.h" // for VM_TO_HHDM
 
 static int var_data = 1;
 static int var_bss;

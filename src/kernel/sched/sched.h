@@ -64,7 +64,7 @@
  * an idle task:
  *
  * ```
- * static void _idle_task(void) { for (;;) { __asm__("hlt"); } }
+ * static void _idle_task(void) { for (;;) { hlt(); } }
  * ...
  * struct scheduler scheduler;
  * sched_add_task(&scheduler, _idle_task);

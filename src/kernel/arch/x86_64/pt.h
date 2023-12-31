@@ -19,6 +19,7 @@
 #include <stdint.h>
 
 #include "arch/x86_64/registers.h" // CR3 register
+#include "common/util.h"           // for static_assert
 
 // Physical address space size (bits).
 #define PM_ADDR_SPACE_SZ 52
@@ -38,8 +39,8 @@
 // Start of high memory. (E.g., this is the beginning of the HHDM virtual
 // address space.)
 #define VM_HM_START (VM_CANON_BITS | VM_MAX_BIT)
-_Static_assert(VM_CANON_BITS == VM_HM_START,
-               "Canonical bits/high memory computation failure");
+static_assert(VM_CANON_BITS == VM_HM_START,
+              "Canonical bits/high memory computation failure");
 
 // Number of paging levels. Assume 4-level paging for now.
 #define VM_PG_LV 4
@@ -55,10 +56,6 @@ _Static_assert(VM_CANON_BITS == VM_HM_START,
 // Similar to the PG_ALIGNED macro.
 #define VM_HGPG_ALIGNED(sz) (!((size_t)(sz) & (VM_HGPG_SZ - 1)))
 
-// Convert addr to identity/HHDM-mapped address.
-#define VM_TO_IDM(addr) (void *)((uint64_t)(addr) & ~VM_HM_START)
-#define VM_TO_HHDM(addr) (void *)((uint64_t)(addr) | VM_HM_START)
-
 /**
  * Page-map level X table (levels 2-4).
  *
@@ -69,7 +66,7 @@ _Static_assert(VM_CANON_BITS == VM_HM_START,
  * The avl* fields are ignored by the architecture, and the reserved fields must
  * not be used (set to zero).
  *
- * See IA32/64 Reference, Volume 3A, 4-32
+ * See Intel SDM Vol. 3A, Sec. 4.
  */
 struct pmlx_entry {
   uint8_t p : 1;

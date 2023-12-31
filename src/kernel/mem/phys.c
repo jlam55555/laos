@@ -1,7 +1,7 @@
 #include "mem/phys.h"
 
-#include "arch/x86_64/pt.h"
 #include "common/libc.h"
+#include "mem/vm.h" // for VM_TO_HHDM, VM_TO_IDM
 
 #include <assert.h>
 #include <limine.h>

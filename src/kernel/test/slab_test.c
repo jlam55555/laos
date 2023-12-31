@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
+#include "common/util.h" // for static_assert
 #include "test/mem_harness.h"
 #include "test/test.h"
 
@@ -192,7 +193,7 @@ DEFINE_TEST(slab, remains_initialized_after_free_alloc_cycle) {
   struct sixteen_bytes {
     uint64_t a, b;
   } * obj1, *obj2;
-  _Static_assert(sizeof(*obj1) == 16);
+  static_assert(sizeof(*obj1) == 16);
 
   TEST_ASSERT(obj1 = slab_cache_alloc(cache));
 

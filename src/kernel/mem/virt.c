@@ -6,8 +6,9 @@
 #include "arch/x86_64/registers.h"
 #include "common/libc.h"
 #include "drivers/console.h"
-#include "mem/phys.h"
+#include "mem/phys.h" // for phys_alloc_page
 #include "mem/slab.h"
+#include "mem/vm.h" // for VM_TO_IDM, VM_TO_HHDM
 
 /**
  * Allocates and returns a pointer to an empty (zeroed) PMLx table.

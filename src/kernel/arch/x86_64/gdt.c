@@ -79,7 +79,7 @@ __attribute__((naked)) static void _gdt_init_jmp() {
       .offset = (uint64_t)_gdt_init_ret,
       .selector = (struct segment_selector){.index = GDT_SEGMENT_RING0_CODE},
   };
-  __asm__("rex64 ljmp %0" : : "m"(op));
+  __asm__("rex64 ljmp *%0" : : "m"(op));
 }
 
 void gdt_init(void) {

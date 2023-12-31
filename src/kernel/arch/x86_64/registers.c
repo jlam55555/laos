@@ -76,6 +76,7 @@ void msr_write(uint32_t msr, uint64_t value) {
 
 static void _syscall_enter(void) {
   // Syscall entry point. Just for testing for now.
+  // This should be moved out into a different file.
   printf("Entered the kernel again!\r\n");
   for (;;) {
   }

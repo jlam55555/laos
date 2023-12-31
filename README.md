@@ -56,6 +56,19 @@ TODO(jlam55555): Note that headers are not correctly considered as dependencies,
 
 See also [TODO.md](TODO.md).
 
+### Directory structure
+- `src`:
+  - `src/limine`: Limine bootloader submodule.
+  - `src/kernel`:
+    - `src/kernel/arch`: Architecture-specific code. There shouldn't be many direct references to architecture-specific code from outside this directory. If there are ever multiple references to the same architecture-specific interface, this should be abstracted away in some architecture-agnostic interface.
+    - `src/kernel/common`: Utility code and definitions, to be used anywhere.
+    - `src/kernel/diag`: Diagnostic printing code. (deprecated; I'm trying to get rid of this in favor of other ways of dumping diagnostics once we get to userspace processes.)
+    - `src/kernel/drivers`: Hardware drivers.
+    - `src/kernel/mem`: Memory allocators and virtual memory definitions.
+    - `src/kernel/proc`: Userspace utilities.
+    - `src/kernel/sched`: Thread scheduling utilities.
+    - `src/kernel/test`: Unit tests.
+
 ### Learning goals
 
 I.e., interest points.
