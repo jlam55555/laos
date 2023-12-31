@@ -54,5 +54,8 @@ It took me a while to understand how the documentation for the x86_64 ISA was la
 
 Within each volume, I've found it fairly easy to find the topic I'm looking for (whether it be segmentation, paging, exception handling, etc.). And the explanations are full of helpful visuals. Moving forward, I'll try to refer to the relevant section in comments for architecture-specific structs and code snippets.
 
-### misc. facts
+### misc. compiler facts
+Marginally related to asm, but thought I'd include these here.
+
 - The `naked` attribute in C implies the `noinline` and `noclone` attributes. This is because these functions tend to rely on the function call ABI (e.g., that the first argument lies in `%rdi`), which may not be true when inlined. See [initial proposal](https://lore.kernel.org/lkml/19464.59051.727647.820630@pilspetsen.it.uu.se/).
+- The "strict-aliasing rule" is something to keep in mind when derefencing type-punned pointers. This is a problem if you read/write the same memory location via pointers to different types; the compiler treats these as independent due to the strict aliasing optimization, and may reorder accesses to this memory location. [This blog post](https://www.cocoawithlove.com/2008/04/using-pointers-to-recast-in-c-is-bad.html) illustrates the problem well. GCC will detect some simple cases but it's [not guaranteed to catch all cases](https://stackoverflow.com/a/21215391).

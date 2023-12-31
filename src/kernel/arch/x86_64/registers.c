@@ -1,4 +1,6 @@
 #include "arch/x86_64/registers.h"
+#include "arch/x86_64/gdt.h"
+#include <stdint.h>
 
 struct regs _regs;
 
@@ -11,6 +13,8 @@ void reg_read(struct regs *regs) {
   // %rdi will also be wrong, because it's used for the input argument. There
   // are probably ways to get around this (e.g., make this into a macro, make
   // `regs` a global variable, etc.) but I don't think this is too important.
+  //
+  // This can (should?) be written as a pure assembly function.
   __asm__ volatile("push %%rsp"
                    "\n\tpushf"
                    "\n\tpush %%r15"
@@ -55,4 +59,58 @@ void reg_read(struct regs *regs) {
                    "\n\tret"
                    :
                    : "r"(regs), "i"(sizeof *regs));
+}
+
+void msr_read(uint32_t msr, uint64_t *val) {
+  // `rdmsr` reads the MSR into %edx:%ecx.
+  __asm__("rdmsr"
+          : "=a"(*(uint32_t *)val), "=d"(*((uint32_t *)val + 1))
+          : "c"(msr));
+}
+
+void msr_write(uint32_t msr, uint64_t value) {
+  // `wrmsr` writes the MSR from %edx:%ecx. The high bits of %rax/%rcx are
+  // ignored.
+  __asm__("wrmsr" : : "c"(msr), "a"(value), "d"(*((uint32_t *)&value + 1)));
+}
+
+static void _syscall_enter(void) {
+  // Syscall entry point. Just for testing for now.
+  printf("Entered the kernel again!\r\n");
+  for (;;) {
+  }
+}
+
+void msr_enable_sce() {
+  // Set SCE (SysCall Extension) bit. Union is to get around the strict-aliasing
+  // rule.
+  union {
+    struct ia32_efer_msr a;
+    uint64_t b;
+  } efer;
+  msr_read(MSR_IA32_EFER, &efer.b);
+  efer.a.sce = 1;
+  msr_write(MSR_IA32_EFER, efer.b);
+
+  // Set up syscall target address.
+  msr_write(MSR_IA32_LSTAR, (uint64_t)&_syscall_enter);
+
+  // Set up the syscall/sysret segment selectors.
+  union {
+    struct msr_ia32_star a;
+    uint64_t b;
+  } star;
+  star.b = 0;
+  star.a.enter_segment = (struct segment_selector){
+      .index = GDT_SEGMENT_RING0_CODE,
+      .rpl = 0,
+  };
+  star.a.exit_segment = (struct segment_selector){
+      .index = GDT_SEGMENT_RING3_CODE,
+      .rpl = 3,
+  };
+  msr_write(MSR_IA32_STAR, star.b);
+
+  // Set up the syscall flags. 0 means don't mask any flags.
+  msr_write(MSR_IA32_FMASK, 0);
 }

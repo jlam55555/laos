@@ -78,6 +78,9 @@ __attribute__((noreturn)) void _start(void) {
   serial_init();
 #endif // SERIAL
 
+  // Enable and set up syscalls.
+  msr_enable_sce();
+
   virt_mem_init(*limine_memmap_response->entries,
                 limine_memmap_response->entry_count, _run_shell);
 }

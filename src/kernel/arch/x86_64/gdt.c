@@ -109,4 +109,4 @@ void gdt_init(void) {
   _gdt_init_jmp();
 }
 
-void tss_set_kernel_stack(void *rsp0) { _tss.rsp0 = rsp0; }
+void tss_set_kernel_stack(void *rsp0) { _tss.rsp0 = (uint64_t)rsp0; }
