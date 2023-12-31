@@ -1,9 +1,10 @@
 #include "arch/x86_64/gdt.h"
-#include "arch/x86_64/idt.h"
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
+
+#include "arch/x86_64/idt.h"
+#include "common/libc.h" // for memset
 
 static struct gdt_segment_desc _gdt[7];
 static const struct gdt_desc _gdt_desc = {

@@ -27,3 +27,12 @@ arch_stack_switch:
         pop %rbx
         pop %rbp
         ret
+
+        .globl arch_stack_jmp
+        // __attribute__((noreturn)) void arch_stack_jmp(void *stk, void *rip);
+arch_stack_jmp:
+        mov %rdi, %rsp
+        // Put a zero at the top of the call stack. Returning from the jumped-to
+        // function will lead to a page fault.
+        push $0
+        jmp *%rsi

@@ -15,7 +15,9 @@
 #ifndef ARCH_X86_64_PT_H
 #define ARCH_X86_64_PT_H
 
+#include <limine.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "arch/x86_64/registers.h" // CR3 register
@@ -113,5 +115,10 @@ static inline bool va_is_canonical(void *addr) {
   uint64_t bits = (uint64_t)addr & VM_CANON_BITS;
   return bits == VM_CANON_BITS || !bits;
 }
+
+/**
+ * Set up the page table. Called by the virtual memory manager.
+ */
+void arch_pt_init(struct limine_memmap_entry *init_mmap, size_t entry_count);
 
 #endif // ARCH_X86_64_PT_H
