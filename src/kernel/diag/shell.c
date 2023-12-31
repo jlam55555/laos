@@ -81,7 +81,11 @@ static void _foo(void) {
 
   // Still doesn't work because writing to the terminal device requires a
   // privileged command. Sad. Will implement syscalls soon.
-  printf("Made it to userspace! Woohoo!\r\n");
+  /* printf("Made it to userspace! Woohoo!\r\n"); */
+
+  // Syscall interface is not set up yet.
+  __asm__ volatile("syscall");
+
   for (;;) {
   }
 }

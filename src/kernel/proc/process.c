@@ -23,6 +23,9 @@ __attribute__((naked)) void proc_jump_userspace(void (*cb)(void)) {
 
   // Set up the stack. Refer to Intel SDM Vol. 3A Sec. 6.12 Figure 6-4.
   // SS is handled automatically by iret.
+  //
+  // We're not really supposed to clobber %rsp in extended asm, but this is okay
+  // since there's nothing afterwards.
   __asm__ volatile("mov %0, %%ax"
                    "\n\tmov %%ax, %%ds"
                    "\n\tmov %%ax, %%es"
@@ -37,6 +40,11 @@ __attribute__((naked)) void proc_jump_userspace(void (*cb)(void)) {
                    "\n\tpush %3"    // RIP
                    "\n\tiretq"
                    :
+                   // `ring3_*_selector` are already in memory, and `cb` is in a
+                   // register. It's important that we don't read `cb` from
+                   // memory since that means it'll be put on the stack and we
+                   // clobber the stack. It's probably safest to do this from a
+                   // pure asm function but this _should_ be fine for now.
                    : "m"(ring3_data_selector), "m"(ring3_data_selector),
                      "m"(ring3_code_selector), "r"(cb));
 }

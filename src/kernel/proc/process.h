@@ -1,5 +1,5 @@
 /**
- * Structs related to a process.
+ * Resources for user-space processes.
  */
 
 #ifndef PROC_PROCESS_H

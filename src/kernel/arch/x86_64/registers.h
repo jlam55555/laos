@@ -1,55 +1,111 @@
+/**
+ * Struct definitions for x86_64 registers. This can be roughly broken down into
+ * 64-bit general-purpose registers (GPRs) and other userspace-accessible
+ * registers, 16-bit segment registers, and 64-bit model-specific registers
+ * (MSRs).
+ *
+ * - GPRs and other userspace-accessible registers are prefixed by 'r':
+ *   - %r{a-d}x, %r{8-15}, %r{r,s}p, %r{s,d}i: GPRs. Some of these have special
+ *     semantics dictated by the Intel microarchitecture, and some have special
+ *     semantics based on the function call ABI.
+ *   - %rip: Instruction pointer (a.k.a. program counter)
+ *   - %rflags: Status register
+ *
+ * See: https://wiki.osdev.org/CPU_Registers_x86-64.
+ *
+ * The MSR specs can be found in Intel SDM Vol. 4. We don't use anything _too_
+ * esoteric, but we assume at least the existence of x86_64 specific registers
+ * such as IA32_EFER and IA32_LSTAR.
+ */
+
 #ifndef REGISTERS_H
 #define REGISTERS_H
 
 #include <stdint.h>
 
-// See: https://wiki.osdev.org/CPU_Registers_x86-64
+typedef uint64_t reg64_t;
+struct regs {
+  reg64_t rax;
+  reg64_t rbx;
+  reg64_t rcx;
+  reg64_t rdx;
+  reg64_t rsi;
+  reg64_t rdi;
+  reg64_t rbp;
+  reg64_t r8;
+  reg64_t r9;
+  reg64_t r10;
+  reg64_t r11;
+  reg64_t r12;
+  reg64_t r13;
+  reg64_t r14;
+  reg64_t r15;
 
-// General-purpose registers.
-typedef uint64_t gp_reg_t;
-struct gp_registers {
-  gp_reg_t rax;
-  gp_reg_t rbx;
-  gp_reg_t rcx;
-  gp_reg_t rdx;
-  gp_reg_t rsi;
-  gp_reg_t rdi;
-  gp_reg_t rsp;
-  gp_reg_t rbp;
-  gp_reg_t r8;
-  gp_reg_t r9;
-  gp_reg_t r10;
-  gp_reg_t r11;
-  gp_reg_t r12;
-  gp_reg_t r13;
-  gp_reg_t r14;
-  gp_reg_t r15;
+  reg64_t rflags;
+  reg64_t rsp;
+  reg64_t rip;
 };
 
+/**
+ * Read a snapshot of all the registers at this time.
+ */
+__attribute__((naked)) void reg_read(struct regs *regs);
+
+/**
+ * REG_PRINT is a helper macro that dumps all the registers at the current
+ * point.
+ *
+ * See the implementation of `reg_read()` for some of the nuances behind this
+ * implementation.
+ */
+#define _P(REG) printf("%s=0x%lx\r\n", #REG, _regs.REG);
+extern struct regs _regs;
+#define REG_PRINT                                                              \
+  reg_read(&_regs);                                                            \
+  _P(rax);                                                                     \
+  _P(rbx);                                                                     \
+  _P(rcx);                                                                     \
+  _P(rdx);                                                                     \
+  _P(rsi);                                                                     \
+  _P(rdi);                                                                     \
+  _P(rbp);                                                                     \
+  _P(r8);                                                                      \
+  _P(r9);                                                                      \
+  _P(r10);                                                                     \
+  _P(r11);                                                                     \
+  _P(r12);                                                                     \
+  _P(r13);                                                                     \
+  _P(r14);                                                                     \
+  _P(r15);                                                                     \
+  _P(rflags);                                                                  \
+  _P(rsp);                                                                     \
+  _P(rip);
+#undef P
+
 // E.g., rax -> eax
-inline uint32_t reg_ex(gp_reg_t reg_rx) { return reg_rx; }
+inline uint32_t reg_ex(reg64_t reg_rx) { return reg_rx; }
 
 // E.g., rax -> ax
-inline uint16_t reg_x(gp_reg_t reg_rx) { return reg_rx; }
+inline uint16_t reg_x(reg64_t reg_rx) { return reg_rx; }
 
 // E.g., rax -> ah
-inline uint8_t reg_h(gp_reg_t reg_rx) { return reg_rx >> 8; }
+inline uint8_t reg_h(reg64_t reg_rx) { return reg_rx >> 8; }
 
 // E.g., rax -> al
-inline uint8_t reg_l(gp_reg_t reg_rx) { return reg_rx; }
+inline uint8_t reg_l(reg64_t reg_rx) { return reg_rx; }
 
 struct rip_register {
   void *ip;
 };
 
-typedef uint16_t seg_reg_t;
+typedef uint16_t reg16_t;
 struct segment_registers {
-  seg_reg_t cs;
-  seg_reg_t ds;
-  seg_reg_t es;
-  seg_reg_t ss;
-  seg_reg_t fs;
-  seg_reg_t gs;
+  reg16_t cs;
+  reg16_t ds;
+  reg16_t es;
+  reg16_t ss;
+  reg16_t fs;
+  reg16_t gs;
 };
 
 struct rflags_register {

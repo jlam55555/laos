@@ -5,6 +5,7 @@
 
 #include "arch/x86_64/gdt.h"
 #include "arch/x86_64/interrupt.h"
+#include "arch/x86_64/registers.h"
 #include "common/libc.h"
 #include "common/util.h"
 #include "diag/shell.h"

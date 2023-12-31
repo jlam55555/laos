@@ -53,3 +53,6 @@ It took me a while to understand how the documentation for the x86_64 ISA was la
 3. **System programming guide**: technical explanation of concepts and how to use them. I find this the most useful, as it carefully lays out memory layouts, constraints, etc. needed to successfully use certain features of the CPU. 
 
 Within each volume, I've found it fairly easy to find the topic I'm looking for (whether it be segmentation, paging, exception handling, etc.). And the explanations are full of helpful visuals. Moving forward, I'll try to refer to the relevant section in comments for architecture-specific structs and code snippets.
+
+### misc. facts
+- The `naked` attribute in C implies the `noinline` and `noclone` attributes. This is because these functions tend to rely on the function call ABI (e.g., that the first argument lies in `%rdi`), which may not be true when inlined. See [initial proposal](https://lore.kernel.org/lkml/19464.59051.727647.820630@pilspetsen.it.uu.se/).
