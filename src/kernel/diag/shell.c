@@ -1,14 +1,20 @@
 #include "diag/shell.h"
 
-#include "arch/x86_64/interrupt.h"
 #include "common/libc.h"
 #include "common/util.h"
 #include "diag/mm.h"
 #include "drivers/console.h"
 #include "drivers/term.h"
-#include "mem/phys.h"
 #include "sched/sched.h"
 #include "test/test.h"
+
+// TODO(jlam55555): Remove this once we add sched_new prelude.
+#include "common/opcodes.h" // for op_sti
+
+// TODO(jlam55555): For testing shell commands; remove
+#include "mem/phys.h" // for phys_alloc_page
+
+#include "proc/process.h" // for proc_jump_userspace
 
 #define SHELL_INPUT_BUF_SZ 4095
 
@@ -67,55 +73,49 @@ void _shell_handle_input(void) {
   // Null-terminate string.
   _shell_input_buf[_shell_input_size] = 0;
 
-  // TODO(jlam55555): Implement some simple commands here.
+  // Dispatch command.
   _shell_dispatch(_shell_input_buf);
 
   // Reset terminal input.
   _shell_input_size = 0;
 }
 
-/**
- * Copied from https://wiki.osdev.org/8259_PIC. Can be used for diagnostics.
- */
-#define PIC1_CMD 0x20
-#define PIC1_DATA 0x21
-#define PIC2_CMD 0xA0
-#define PIC2_DATA 0xA1
-#define PIC_READ_IRR 0x0a /* OCW3 irq ready next CMD read */
-#define PIC_READ_ISR 0x0b /* OCW3 irq service next CMD read */
+static void _foo(void) {
+  // Trigger a GP fault:
+  /* __asm__ volatile("cli"); */
 
-/* Helper func */
-static uint16_t __pic_get_irq_reg(int ocw3) {
-  /* OCW3 to PIC CMD to get the register values.  PIC2 is chained, and
-   * represents IRQs 8-15.  PIC1 is IRQs 0-7, with 2 being the chain */
-  outb(ocw3, PIC1_CMD);
-  outb(ocw3, PIC2_CMD);
-  return (((uint16_t)inb(PIC2_CMD)) << 8) | inb(PIC1_CMD);
+  // Still doesn't work because writing to the terminal device requires a
+  // privileged command. Sad. Will implement syscalls soon.
+  /* printf("Made it to userspace! Woohoo!\r\n"); */
+
+  // Syscall interface is not set up yet.
+  __asm__ volatile("syscall");
+
+  for (;;) {
+  }
 }
-
-/* Returns the combined value of the cascaded PICs irq request register */
-uint16_t pic_get_irr(void) { return __pic_get_irq_reg(PIC_READ_IRR); }
-
-/* Returns the combined value of the cascaded PICs in-service register */
-uint16_t pic_get_isr(void) { return __pic_get_irq_reg(PIC_READ_ISR); }
 
 void shell_init() {
   // Need to re-enable interrupts once the task is created since we cli upon
   // entering the scheduler.
   //
-  // TODO(jlam): Move this to a helper function so we don't need this at the
-  // beginning of each thread.
-  __asm__ volatile("sti");
+  // TODO(jlam55555): Move this to a helper function so we don't need this at
+  // the beginning of each thread. Also so we don't have architecture-specific
+  // stuff outside of arch/.
+  op_sti();
 
   _term_driver = get_default_term_driver();
   _shell_input_size = 0;
   _shell_prompt();
 
+  // Jump into userspace.
+  proc_jump_userspace(_foo);
+
   // Yield task; nothing to do for now.
-  for (;;) {
-    shell_on_interrupt();
-    schedule();
-  }
+  /* for (;;) { */
+  /*   shell_on_interrupt(); */
+  /*   schedule(); */
+  /* } */
 }
 
 void shell_on_interrupt() {

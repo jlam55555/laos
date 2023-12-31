@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "drivers/acpi.h"
 #include "drivers/serial.h"
 #include "drivers/term.h"
 
@@ -60,21 +59,6 @@ int memcmp(const void *s1, const void *s2, size_t n) {
   }
 
   return 0;
-}
-
-// Required for assert.h.
-void __assert_fail(const char *assertion, const char *file, unsigned int line,
-                   const char *function) {
-  printf("%s:%u:%s(): assert(%s) failed\r\n", file, line, function, assertion);
-
-#ifdef RUNTEST
-  acpi_shutdown();
-#else
-  // Similar to _done() in kernel.c.
-  for (;;) {
-    __asm__("hlt");
-  }
-#endif // RUNTEST
 }
 
 bool isprint(char c) { return c >= 32; }

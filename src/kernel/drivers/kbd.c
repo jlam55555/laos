@@ -1,30 +1,25 @@
 #include "drivers/kbd.h"
 
 #include "common/keycodes.h"
-#include "common/util.h"
+#include "common/opcodes.h" // for op_outb, op_op_inb
 #include "drivers/console.h"
 #include "drivers/term.h"
 
 /**
- * Mapping from scancodes to keycodes for scancode set 1.
- * The sign of the value indicates whether it is a make or
- * break code; positive values indicate make codes, and
- * negative values indicate break codes. The value KC_INVAL
- * (0x00) indicates a scancode that doesn't map to a keycode.
+ * Mapping from scancodes to keycodes for scancode set 1. The sign of the value
+ * indicates whether it is a make or break code; positive values indicate make
+ * codes, and negative values indicate break codes. The value KC_INVAL (0x00)
+ * indicates a scancode that doesn't map to a keycode.
  *
  * Notes for scan set 1:
- * - For single-byte codes, the keypress scancodes lie
- *   between 0x01 and 0x58, and the keyup scancodes lie
- *   between 0x81 and 0xD8 (shifted up by 0x80).
- * - There are large gaps at 0x59-0x80 and 0xD9-0xFF, presumably
- *   because there are special PS/2 keyboard bytes in that range
- *   (e.g., 0xE0, 0xFA, etc.)
+ * - For single-byte codes, the keypress scancodes lie between 0x01 and 0x58,
+ *   and the keyup scancodes lie between 0x81 and 0xD8 (shifted up by 0x80).
+ * - There are large gaps at 0x59-0x80 and 0xD9-0xFF, presumably because there
+ *   are special PS/2 keyboard bytes in that range (e.g., 0xE0, 0xFA, etc.)
  *
- * TODO(jlam55555): For now, we assume single-byte scancodes.
- *    We need to handle multi-byte scancodes soon.
- *    Ignore print screen and pause for now; these will be
- *    Handled separately.
- *    This is for scan code set 1 only.
+ * TODO(jlam55555): For now, we assume single-byte scancodes. We need to handle
+ * multi-byte scancodes soon. Ignore print screen and pause for now; these will
+ * be Handled separately. This is for scan code set 1 only.
  */
 static const int16_t _sc_to_kc_map[256] = {
     /* 0x00 */
@@ -90,8 +85,8 @@ static bool _pressed_kc_map[256] = {};
 /**
  * Converts a keycode and a make/break boolean to a keyboard event.
  *
- * Also updates the _pressed_kc_map mapping. Handles regular keys
- * differently than toggle keys (Caps Lock, Scroll Lock, Num Lock).
+ * Also updates the _pressed_kc_map mapping. Handles regular keys differently
+ * than toggle keys (Caps Lock, Scroll Lock, Num Lock).
  */
 static struct kbd_event _generate_kbd_evt(enum keycode kc, bool is_make) {
   enum kbd_event_type type =
@@ -132,26 +127,26 @@ static struct kbd_event _generate_kbd_evt(enum keycode kc, bool is_make) {
 /**
  * Customizable keyboard event handler, called by the IRQ.
  *
- * TODO(jlam55555): For now not really customizable. Right now
- *    the only "customization" is for the terminal. Later on this
- *    may be generalized as part of a broader input subsystem.
- * TODO(jlam55555): Convert special characters, such as arrow keys,
- *    into multi-byte ANSI escape sequences. This should only be done
- *    for the terminal, and not other parts of the input subsystem.
+ * TODO(jlam55555): For now not really customizable. Right now the only
+ * "customization" is for the terminal. Later on this may be generalized as part
+ * of a broader input subsystem.
+ *
+ * TODO(jlam55555): Convert special characters, such as arrow keys, into
+ * multi-byte ANSI escape sequences. This should only be done for the terminal,
+ * and not other parts of the input subsystem.
  */
 struct term_driver *_term_driver;
 static void _handle_evt(struct kbd_event evt) {
   // evt.ascii < 0 indicates a key that doesn't correspond to an ASCII
-  // character. We would still report this to a more generalized input
-  // subsystem that cares about all keyboard events, but no
-  // data would be sent to the terminal. Similarly, the terminal
-  // only cares about keydown/keypress events.
+  // character. We would still report this to a more generalized input subsystem
+  // that cares about all keyboard events, but no data would be sent to the
+  // terminal. Similarly, the terminal only cares about keydown/keypress events.
   if (evt.ascii < 0 || evt.type == KBD_EVENT_KEYUP) {
     return;
   }
 
-  // Alt-key handling: insert an escape byte beforehand.
-  // This can happen in conjunction with control sequences.
+  // Alt-key handling: insert an escape byte beforehand. This can happen in
+  // conjunction with control sequences.
   if (evt.km & KM_ALT) {
     _term_driver->master_write(_term_driver->dev, "\e", 1);
   }
@@ -168,13 +163,13 @@ static void _handle_evt(struct kbd_event evt) {
 }
 
 static void _kbd_irq(uint8_t data) {
-  // During normal operation, we don't expect to be sending any commands
-  // that would return an ACK or RESEND, so ignore these for now. If we
-  // decide to send commands, then we should account for these.
+  // During normal operation, we don't expect to be sending any commands that
+  // would return an ACK or RESEND, so ignore these for now. If we decide to
+  // send commands, then we should account for these.
   //
-  // The only time commands are being sent at the time of writing are
-  // during initialization, which should not be raising interrupts and
-  // thus will not be handled here.
+  // The only time commands are being sent at the time of writing are during
+  // initialization, which should not be raising interrupts and thus will not be
+  // handled here.
   if (data == PS2_KBD_ACK || data == PS2_KBD_RESEND) {
     return;
   }
@@ -197,20 +192,20 @@ static void _kbd_irq(uint8_t data) {
 }
 
 /**
- * Waits for the output buffer to be ready. This should return
- * true before attempting to read from PS2_KBD_PORT.
+ * Waits for the output buffer to be ready. This should return true before
+ * attempting to read from PS2_KBD_PORT.
  */
 static void _ps2_kbd_wait_for_output(void) {
-  while (!(inb(PS2_KBDCTRL_PORT) & PS2_KBDCTRL_STATUS_OUT)) {
+  while (!(op_inb(PS2_KBDCTRL_PORT) & PS2_KBDCTRL_STATUS_OUT)) {
   }
 }
 
 /**
- * Waits for the input buffer to be ready. This should return
- * true before attempting to write to PS2_KBD_PORT or PS2_KBDCTRL_PORT.
+ * Waits for the input buffer to be ready. This should return true before
+ * attempting to write to PS2_KBD_PORT or PS2_KBDCTRL_PORT.
  */
 static void _ps2_kbd_wait_for_input(void) {
-  while (inb(PS2_KBDCTRL_PORT) & PS2_KBDCTRL_STATUS_IN) {
+  while (op_inb(PS2_KBDCTRL_PORT) & PS2_KBDCTRL_STATUS_IN) {
   }
 }
 
@@ -219,9 +214,9 @@ static void _ps2_kbd_wait_for_input(void) {
  */
 static uint8_t _ps2_kbdctrl_get_config(void) {
   _ps2_kbd_wait_for_input();
-  outb(PS2_KBDCTRL_CMD_GET_CONFIG, PS2_KBDCTRL_PORT);
+  op_outb(PS2_KBDCTRL_CMD_GET_CONFIG, PS2_KBDCTRL_PORT);
   _ps2_kbd_wait_for_output();
-  return inb(PS2_KBD_PORT);
+  return op_inb(PS2_KBD_PORT);
 }
 
 /**
@@ -229,70 +224,66 @@ static uint8_t _ps2_kbdctrl_get_config(void) {
  */
 static void _ps2_kbdctrl_set_config(uint8_t config) {
   _ps2_kbd_wait_for_input();
-  outb(PS2_KBDCTRL_CMD_SET_CONFIG, PS2_KBDCTRL_PORT);
+  op_outb(PS2_KBDCTRL_CMD_SET_CONFIG, PS2_KBDCTRL_PORT);
   _ps2_kbd_wait_for_input();
-  outb(config, PS2_KBD_PORT);
+  op_outb(config, PS2_KBD_PORT);
 }
 
 /**
- * Read scancode set. Note that the output of this
- * function depends on the value of bit 6 of the
- * PS/2 controller configuration byte (scancode set
- * 2->1 translation). If that bit is unset, then this
- * should return 1, 2, or 3 for scancode sets 1, 2,
- * or 3, respectively. If that bit is set, then this
- * will return 0x43, 0x41, or 0x3f, respectively.
+ * Read scancode set. Note that the output of this function depends on the value
+ * of bit 6 of the PS/2 controller configuration byte (scancode set 2->1
+ * translation). If that bit is unset, then this should return 1, 2, or 3 for
+ * scancode sets 1, 2, or 3, respectively. If that bit is set, then this will
+ * return 0x43, 0x41, or 0x3f, respectively.
  *
  * TODO(jlam55555): Error checking on return values.
  */
 static uint8_t _ps2_kbd_get_scancodeset(void) {
   _ps2_kbd_wait_for_input();
-  outb(PS2_KBD_CMD_SCANCODESET, PS2_KBD_PORT);
+  op_outb(PS2_KBD_CMD_SCANCODESET, PS2_KBD_PORT);
   _ps2_kbd_wait_for_output();
-  inb(PS2_KBD_PORT);
+  op_inb(PS2_KBD_PORT);
   _ps2_kbd_wait_for_input();
   // 0x00 is the read scancodeset subcommand.
-  outb(0x00, PS2_KBD_PORT);
+  op_outb(0x00, PS2_KBD_PORT);
   _ps2_kbd_wait_for_output();
-  inb(PS2_KBD_PORT);
+  op_inb(PS2_KBD_PORT);
   _ps2_kbd_wait_for_output();
-  return inb(PS2_KBD_PORT);
+  return op_inb(PS2_KBD_PORT);
 }
 
 /**
  * Set scancode set.
  */
 static void _ps2_kbd_set_scancodeset(uint8_t scancodeset) {
-  outb(PS2_KBD_CMD_SCANCODESET, PS2_KBD_PORT);
+  op_outb(PS2_KBD_CMD_SCANCODESET, PS2_KBD_PORT);
   _ps2_kbd_wait_for_output();
-  inb(PS2_KBD_PORT);
+  op_inb(PS2_KBD_PORT);
   _ps2_kbd_wait_for_input();
-  outb(scancodeset, PS2_KBD_PORT);
+  op_outb(scancodeset, PS2_KBD_PORT);
   _ps2_kbd_wait_for_output();
-  inb(PS2_KBD_PORT);
+  op_inb(PS2_KBD_PORT);
 }
 
 static void _driver_init(__attribute__((unused)) struct kbd_driver *driver) {
   // Consume outstanding output from device.
-  while (inb(PS2_KBDCTRL_PORT) & PS2_KBDCTRL_STATUS_OUT) {
-    inb(PS2_KBD_PORT);
+  while (op_inb(PS2_KBDCTRL_PORT) & PS2_KBDCTRL_STATUS_OUT) {
+    op_inb(PS2_KBD_PORT);
   }
 
-  // Update configuration. Turn off scancode set 2->1 translation.
-  // This makes the behavior less confusing IMO.
+  // Update configuration. Turn off scancode set 2->1 translation. This makes
+  // the behavior less confusing IMO.
   _ps2_kbdctrl_set_config(_ps2_kbdctrl_get_config() &
                           ~PS2_KBDCTRL_CONFIG_TRANSLATE);
 
-  // Set scan code set 1, if not set already.
-  // (Default is scan code set 2).
+  // Set scan code set 1, if not set already. (Default is scan code set 2).
   if (_ps2_kbd_get_scancodeset() != PS2_KBD_SCANCODESET1) {
     _ps2_kbd_set_scancodeset(PS2_KBD_SCANCODESET1);
   }
 
   // Activate device and enable interrupts.
-  // TODO(jlam55555): Do this properly, following the OSDev wiki.
-  //    The above by itself works on QEMU, but this is not robust by
-  //    any means.
+  // TODO(jlam55555): Do this properly, following the OSDev wiki. The above by
+  // itself works on QEMU, but this is not robust by any means.
 
   // Set term_driver, for use in the IRQ handler. Later, this should
   // be moved to the input subsystem when that's fleshed out more.

@@ -3,8 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "arch/x86_64/pt.h"
-#include "common/util.h"
+#include "common/opcodes.h" // for op_inb, op_op_outb
+#include "mem/vm.h"         // for VM_TO_HHDM
 
 // VGA video buffer memory address.
 static volatile char *_video_mem = (volatile char *)VM_TO_HHDM(0xB8000);
@@ -40,11 +40,11 @@ static struct console _console = {
  * Copied from https://wiki.osdev.org/Text_Mode_Cursor.
  */
 void _vga_cursor_enable(uint8_t cursor_start, uint8_t cursor_end) {
-  outb(0x0A, 0x3D4);
-  outb((inb(0x3D5) & 0xC0) | cursor_start, 0x3D5);
+  op_outb(0x0A, 0x3D4);
+  op_outb((op_inb(0x3D5) & 0xC0) | cursor_start, 0x3D5);
 
-  outb(0x0B, 0x3D4);
-  outb((inb(0x3D5) & 0xE0) | cursor_end, 0x3D5);
+  op_outb(0x0B, 0x3D4);
+  op_outb((op_inb(0x3D5) & 0xE0) | cursor_end, 0x3D5);
 }
 
 /**
@@ -55,10 +55,10 @@ void _vga_cursor_enable(uint8_t cursor_start, uint8_t cursor_end) {
 void _vga_cursor_move(int row, int col) {
   uint16_t pos = row * 80 + col;
 
-  outb(0x0F, 0x3D4);
-  outb((uint8_t)(pos & 0xFF), 0x3D5);
-  outb(0x0E, 0x3D4);
-  outb((uint8_t)((pos >> 8) & 0xFF), 0x3D5);
+  op_outb(0x0F, 0x3D4);
+  op_outb((uint8_t)(pos & 0xFF), 0x3D5);
+  op_outb(0x0E, 0x3D4);
+  op_outb((uint8_t)((pos >> 8) & 0xFF), 0x3D5);
 }
 
 static void _console_refresh(struct console *);

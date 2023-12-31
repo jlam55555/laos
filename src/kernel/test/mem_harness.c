@@ -1,10 +1,10 @@
 #include "test/mem_harness.h"
 
-#include "arch/x86_64/pt.h" // VM_TO_IDM
-#include "mem/phys.h"       // phys_rra
-#include "mem/slab.h"       // kmalloc
+#include "mem/phys.h" // for struct phys_rra
+#include "mem/slab.h" // for kmalloc
+#include "mem/vm.h"   // for VM_TO_IDM
 
-#include <assert.h> // assert
+#include <assert.h> // for assert
 
 struct phys_rra *phys_fixture_create_rra(void) {
   // Allocate a backing buffer for the page array.

@@ -2,8 +2,8 @@
 
 #include <limine.h>
 
-#include "arch/x86_64/pt.h"
 #include "mem/slab.h"
+#include "mem/vm.h" // VM_TO_HHDM
 #include "test/mem_harness.h"
 #include "test/test.h"
 

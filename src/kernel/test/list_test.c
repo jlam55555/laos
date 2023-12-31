@@ -1,6 +1,6 @@
 #include "common/list.h"
 
-#include "arch/x86_64/pt.h"
+#include "mem/vm.h" // for VM_TO_IDM, VM_TO_HHDM
 #include "test/test.h"
 
 /**

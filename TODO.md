@@ -20,17 +20,23 @@ This list will probably begin as a very generic list and become more and more fo
 - [ ] Terminal multiplexing (like GNU `screen`): multiplex a single terminal device for multiple processes
 
 ### Processes
-- [ ] Kernel thread scheduling
+- [X] Kernel thread scheduling
   - [X] Kernel threads
   - [X] (Cooperative) scheduling -- a `schedule()` function
   - [X] Preemptive scheduling (via timer interrupt)
 - [ ] Userspace processes
-  - [ ] Initial bootstrap from kernel mode into userspace.
-    - [ ] Set up TSS
-    - [ ] Set up userspace stack.
-  - [ ] Syscall interface -- clone(), fork(), wait(), read(), write()
-  - [ ] Scheduler waitqueues for different events: wait on file.
-  - [ ] Userspace memory mapping/protection.
+  - [X] Initial bootstrap from kernel mode into userspace.
+    - [X] Set up TSS
+    - [X] Set up userspace stack.
+  - [ ] Syscall interface
+    - [ ] mmap
+    - [ ] exec
+    - [ ] clone
+    - [ ] fork
+    - [ ] wait
+    - [ ] read
+    - [ ] write
+  - [ ] Scheduler waitqueues for different events: wait on file or process
 - [ ] Backtrace
 - [ ] Locking primitives
 - [ ] Utilities
@@ -39,19 +45,23 @@ This list will probably begin as a very generic list and become more and more fo
   - [ ] ps and pstree
 
 ### Memory
-- Descriptor tables
-  - [ ] Set up custom GDT
+- [X] Descriptor tables
+  - [X] Set up custom GDT
   - [X] Set up custom IDT
-- Physical memory utilities:
+- [X] Physical memory utilities:
   - [X] struct page array
   - [X] Page allocator (round-robin)
   - [X] Slab allocator (simple kmalloc)
-- Paging (virtual memory) utilities:
+- [X] Paging (virtual memory) utilities:
   - [X] Create a page table, map pages into it
   - [X] Swap out the page table
   - [X] Unmap pages from page table
-  - [ ] mmap/nopage utilities for userspace
 - [ ] Swapping
+
+### File interface
+- [ ] Simple file/device interface
+  - [ ] Read/write syscalls
+- [ ] Filesystem
 
 ### Libraries/applications
 - [ ] libc implementation

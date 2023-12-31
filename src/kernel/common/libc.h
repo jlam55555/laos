@@ -1,8 +1,8 @@
 /**
- * Small subset of the C stdlib.
+ * Implementation of a small part of the C standard library, for kernel use. Not
+ * intended to be standards-compliant.
  *
- * For now, implementations are provided on an
- * as-needs basis.
+ * For now, implementations are provided on an as-needs basis.
  */
 #ifndef COMMON_LIBC_H
 #define COMMON_LIBC_H

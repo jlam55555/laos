@@ -26,9 +26,6 @@
  * - `clone()` and `exec*()` syscalls.
  * - Userspace threads, processes, and process groups.
  *
- * TODO(jlam55555): Set up quanta/pre-emptive scheduling.
- * TODO(jlam55555): Implement processes.
- *
  * =============================================================================
  * Bootstrapping process
  * =============================================================================
@@ -67,7 +64,7 @@
  * an idle task:
  *
  * ```
- * static void _idle_task(void) { for (;;) { __asm__("hlt"); } }
+ * static void _idle_task(void) { for (;;) { hlt(); } }
  * ...
  * struct scheduler scheduler;
  * sched_add_task(&scheduler, _idle_task);
