@@ -1,3 +1,5 @@
+> ## This is superseded by [HmmOS](https://github.com/jlam55555/hmmos).
+
 # laos -- LAm Operating System
 
 A personal study on operating systems, with help from the OSDev Wiki. A long-term weekend side project.
